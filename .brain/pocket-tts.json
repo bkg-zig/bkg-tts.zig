@@ -28,7 +28,8 @@
       "2026-10-29: de/manifest.json lokal gelesen, Felder und Digest-Praefixe gegen export/web.py::split_for_web und _entry sowie pipeline.ts::Manifest geprueft. Digests model 6ea90a844c839eb9..., encoder 80e0efae03c43e2c..., assets 771450 B a0c0bedad0a7780f... stimmen mit den lokal berechneten Werten ueberein.",
       "2026-10-29: de/model.onnx per ORT-C-API geprueft: inputs=12, outputs=7, alle Shapes dynamisch wie im englischen Modell.",
       "2026-10-29: docs/POCKET-TTS-ONNX.md angelegt (258 Zeilen) und README.md um den Verweis ergaenzt. Alle Zeilenangaben im Dokument gegen den Upstream-Quelltext geprueft, drei falsche Verweise korrigiert und vier ungenaue Formulierungen praezisiert. Kein Laufzeitcode geaendert.",
-      "2026-10-30: .brain/tasks.json war durch einen parallelen Append der zweiten Sitzung kein gueltiges JSON. Das fremde Task-Objekt PHONON-KOKORO-RESEARCH-001 unveraendert in das tasks-Array verschoben, alle drei Brain-Dateien wieder valide JSON."
+      "2026-10-30: .brain/tasks.json war durch einen parallelen Append der zweiten Sitzung kein gueltiges JSON. Das fremde Task-Objekt PHONON-KOKORO-RESEARCH-001 unveraendert in das tasks-Array verschoben, alle drei Brain-Dateien wieder valide JSON.",
+      "2026-10-30: Offene Messluecke zur Byte-Identitaet des Encoders geschlossen. Eingebetteter Encoder aus pocket-tts-english.onnx dekodiert und mit de/encoder.onnx verglichen: gleiche Architektur und gleicher I/O, aber andere Gewichte in allen 45 Initializern. Beide Encoder per ORT-C-API geprueft. Vergleichsprogramm liegt unter /home/openchamber/dump/pocket-research/pocket_encoder_compare.py."
     ],
     "changed_files": [
       ".brain/pocket-tts.json",
@@ -64,7 +65,9 @@
       "2026-10-29: Deutscher Encoder de/encoder.onnx (39183564 B, sha256 80e0efae03c43e2ca1252874095fa1df4a2f36c5140246c9349810de70abdd50) geladen und per ORT-C-API geprueft: 1 Input audio float32 [1,1,-1], 1 Output cond float32 [1,-1,1024]. Protobuf-Struktur: ir_version 8, Producer pytorch, Opset ai.onnx 17, 553 Nodes, 45 Initializers, Magic 08 08 12 07 pytorch 1a 06 2.1, keine Quant-Ops. Der Step-Graph dagegen mit 24 DynamicQuantizeLinear und 24 MatMulInteger.",
       "2026-10-29: assets.json-Schema aus export/web.py (config, tokenizer, voices) und packages/pocket-tts-onnx/src/tts.ts::Assets belegt.",
       "2026-10-29: Dauerhafte Dokumentation docs/POCKET-TTS-ONNX.md angelegt, README.md verweist auf das Dokument.",
-      "2026-10-30: Alle drei Brain-Dateien als gueltiges JSON geprueft, CJK-Zeichen und Em-Dash in der Doku geprueft: 0 Treffer in docs/POCKET-TTS-ONNX.md."
+      "2026-10-30: Alle drei Brain-Dateien als gueltiges JSON geprueft, CJK-Zeichen und Em-Dash in der Doku geprueft: 0 Treffer in docs/POCKET-TTS-ONNX.md.",
+      "2026-10-30: Offene Messluecke geschlossen. Die englischen Single-Files lagen erneut unter /home/openchamber/dump/pocket-research/. Der eingebettete Encoder aus pocket-tts-english.onnx wurde aus dem Metadatenwert pocket_tts_encoder dekodiert: 39183564 B, sha256 89451a17187f589bb00d6b127e4bb82d99849d31472abd62c5546acd78df0246. Er ist NICHT bytegleich mit de/encoder.onnx (sha256 80e0efae03c43e2ca1252874095fa1df4a2f36c5140246c9349810de70abdd50). Beide haben dieselbe Architektur: ir_version 8, Producer pytorch 2.13.0, Opset 17, 553 Nodes mit identischer Node-Liste, 45 Initializers mit identischen Namen. Alle 45 Initializer haben andere Werte, auch tts.flow_lm.bos_before_voice. pocket-tts-english-ipa.onnx bettet dieselben Bytes ein. Beide Encoder per ORT-C-API geprueft: inputs=1 (audio float32 [1,1,-1]), outputs=1 (cond float32 [1,-1,1024]). Vergleichsprogramm: /home/openchamber/dump/pocket-research/pocket_encoder_compare.py.",
+      "2026-10-30: Die englischen Modelldateien wurden nicht geloescht, weil eine zweite Sitzung sie seit dem 30.10.2026 um 00:11 und 00:12 neu geladen hat und weiter nutzt."
     ],
     "sources": [
       "/home/openchamber/dump/upstream-clones/pocket-tts/packages/pocket-tts-onnx/src/tts.ts",
@@ -86,10 +89,9 @@
       "/home/openchamber/.local/share/onnxruntime/include/onnxruntime_c_api.h"
     ],
     "open": [
-      "Byte-Identitaet des deutschen Encoders mit dem in pocket-tts-english.onnx eingebetteten Encoder ist lokal nicht nachweisbar, weil die englische Single-File geloescht wurde. Struktur und Groesse stimmen: 39183564 B, ir_version 8, Producer pytorch, Opset ai.onnx 17, 553 Nodes, 45 Initializers.",
       "Ob neben den vier dokumentierten Metadaten-Schluesseln weitere zulaessig sind, ist nicht dokumentiert. Der Export schreibt genau pocket_tts_config, pocket_tts_tokenizer, pocket_tts_encoder und pocket_tts_voice/<name>. Fuer die Web-Variante gilt: model.onnx hat 0 Metadaten, assets.json fuehrt config, tokenizer und voices.",
       "Python und TypeScript liefern bei gleichem Seed unterschiedliche Rauschwerte, weil numpy default_rng und mulberry32 verschiedene Zufallsfolgen erzeugen. Beide skalieren mit sqrt(temperature). Fuer bitgleiche Ausgabe muesste eine der beiden Folgen festgeschrieben werden.",
-      "Die englischen Modelldateien wurden nach der Messung geloescht, das Dateisystem war zu 93 Prozent belegt. Fuer eine Portierung muessen pocket-tts-english.onnx und pocket-tts-english-ipa.onnx neu geladen werden."
+      "Die englischen Modelldateien wurden nach der ersten Messung geloescht, das Dateisystem war zu 93 Prozent belegt. Sie liegen seit dem 30.10.2026 wieder unter /home/openchamber/dump/pocket-research/, werden dort aber von einer zweiten Sitzung genutzt und wurden deshalb nicht erneut geloescht."
     ],
     "next_action": "Zig-Port: Step-Graph per ORT-C-API fahren, Metadaten ueber SessionGetModelMetadata und ModelMetadataLookupCustomMetadataMap lesen, Voice-Prefill mit gates [0,0,1], Text-Prompt mit gates [1,0,0], danach Latent-Schritte mit gates [0,1,0] und is_bos=1 im ersten Schritt."
   },
@@ -108,12 +110,12 @@
       "Single-File-Modelle gibt es nur fuer Englisch. Eine deutsche Single-File-Datei existiert weder im HF-Repo noch im GitHub-Release models-v1.0.",
       "Korrektur zur frueheren Notiz: die Graph-Eingaben heissen tokens, latent, is_bos und cond, nicht text_embeds und conditioning.",
       "Encoder (de/encoder.onnx, 39183564 B) per ORT-C-API verifiziert: 1 Input audio float32 [1,1,-1], 1 Output cond float32 [1,-1,1024]. Graph: ir_version 8, Producer pytorch, Opset ai.onnx 17, 553 Nodes, 45 Initializers, keine Quant-Ops. Der Encoder ist damit nicht quantisiert, der Step-Graph dagegen schon (24 DynamicQuantizeLinear, 24 MatMulInteger).",
+      "Der in pocket-tts-english.onnx eingebettete Encoder (pocket_tts_encoder, base64) hat dieselbe Architektur und denselben I/O-Vertrag, aber andere Gewichte: 39183564 B, sha256 89451a17187f589bb00d6b127e4bb82d99849d31472abd62c5546acd78df0246 gegenueber 80e0efae03c43e2ca1252874095fa1df4a2f36c5140246c9349810de70abdd50 bei de/encoder.onnx. Gleiche Node-Liste und gleiche Initializer-Namen, aber alle 45 Initializer mit anderen Werten. pocket-tts-english-ipa.onnx bettet dieselben Bytes ein. Jede Sprache braucht den Encoder ihres Asset-Sets.",
       "manifest.json (Web-Variante): version 1, baseUrl, model/encoder/assets mit {file, bytes, sha256 (16 Hex-Zeichen)}, sampleRate 24000, voices alphabetisch, voiceLanguages, phonemes false. assets.json fuehrt config, tokenizer und voices, model.onnx selbst hat keine ONNX-Metadaten.",
       "Cache-Vertrag: flow_kv waechst und wird nach jedem Chunk auf die Voice-Laenge zurueckgesetzt, flow_offset zaehlt die Eintraege. mimi_kv ist immer die letzten 266 Eintraege und vorne nullgepolstert, mimi_offset und mimi_conv mit 14720 Werten sind Zustand ueber die Frames eines Chunks.",
       "Der vollstaendige Vertrag mit allen Zahlen und Quellzitaten steht in docs/POCKET-TTS-ONNX.md."
     ],
     "open": [
-      "Byte-Identitaet des deutschen Encoders mit dem eingebetteten englischen Encoder ist lokal nicht nachweisbar, weil die englische Single-File geloescht wurde. Struktur und Groesse sind identisch.",
       "Die Rauschzahlen von Python (numpy default_rng) und TypeScript (mulberry32) unterscheiden sich, beide skalieren mit sqrt(temperature)."
     ],
     "next_action": "Zig-Port auf Basis der verifizierten I/O- und Metadatenwerte. Der vollstaendige Vertrag steht in docs/POCKET-TTS-ONNX.md. Reihenfolge: Metadaten lesen, Assets aus assets.json oder ONNX-Metadaten, Voice-Prefill mit gates [0,0,1], Text-Schritt mit gates [1,0,0], danach Latent-Schritte mit gates [0,1,0] und is_bos=1 im ersten Schritt."

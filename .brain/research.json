@@ -1,57 +1,6 @@
 {
   "previous": {
-    "focus": "Pocket-TTS-ONNX-Laufzeitvertrag an echten Modelldateien verifizieren (Englisch, Englisch-IPA, Deutsch)",
-    "status": "abgeschlossen",
-    "changed_files": [
-      ".brain/research.json",
-      ".brain/memory.json",
-      ".brain/tasks.json",
-      "docs/POCKET-TTS-ONNX.md",
-      "README.md"
-    ],
-    "verification": [
-      "2026-10-29: pocket-tts-english.onnx (228144283 B, sha256 b157f4a949477df83f9d0a141d5bc68de7aa2a6c9dfd3dcdc49c0642e6a66e4c), pocket-tts-english-ipa.onnx (231924037 B) und de/model.onnx (173604779 B, sha256 6ea90a844c839eb91b4d429835921e0fd9b6d8be716ff5a304b473ccdd322805) von huggingface.co/thewh1teagle/pocket-tts-onnx geladen und mit eigenem Protobuf-Parser (/home/openchamber/dump/pocket-research/inspect_onnx.py, ohne onnx-Paket) ausgelesen.",
-      "2026-10-29: Eingaben verifiziert: tokens int64 [1,'seq'], latent float32 [1,'seq',32], is_bos float32 [1,'seq',1], cond float32 [1,'seq',1024], gates float32 [3], noise float32 [1,32], flow_kv float32 ['past',6,2,1,16,64], flow_offset int64 Skalar, mimi_kv float32 [266,2,2,1,8,64], mimi_offset int64 Skalar, mimi_conv float32 [14720], decode_steps float32 Skalar; nur die Adapter-Datei hat zusaetzlich lora float32 Skalar.",
-      "2026-10-29: Ausgaenge verifiziert: audio float32 [1,1,1920], next_latent float32 [1,1,32], eos_logit float32 [1,1], flow_kv_new float32 ['seq',6,2,1,16,64], mimi_kv_new float32 [16,2,2,1,8,64], mimi_offset_out int64 Skalar, mimi_conv_out float32 [14720].",
-      "2026-10-29: pocket_tts_config des englischen Modells vollstaendig gelesen: sample_rate 24000, frame_rate 12.5, frame_size 1920, latent_dim 32, model_dim 1024, flow_layers 6, flow_heads 16, flow_head_dim 64, mimi_layers 2, mimi_heads 8, mimi_head_dim 64, mimi_kv_len 266, mimi_steps_per_latent 16, conv_state_size 14720, sampler_decode_steps 1, max_decode_steps 4, temperature 0.3, noise_clamp null, eos_threshold -4.0, max_tokens_per_chunk 50, pad_with_spaces_for_short_inputs false, remove_semicolons false, frames_after_eos null, tokens_per_second_estimate 3.0, gen_seconds_padding 2.0, language english, quantized true.",
-      "2026-10-29: Deutsches assets.json (771450 B, sha256 a0c0bedad0a7780f254abbc359ebf7a12985fe79c4c4266d218d5d391823b2e3) gelesen: language german, temperature 0.7, remove_semicolons true, voices juergen [127,1024] und alba [126,1024], voice_languages de/de, tokenizer 59837 B (sha256 389079b9c67cd17ff1c565d53bc695df390b4ca8abf2300947e659585edd9d2a). de/model.onnx enthaelt 0 Metadaten-Eintraege (export/web.py::split_for_web loescht sie per del model.metadata_props[:]).",
-      "2026-10-29: Tokenizer-Protobuf verifiziert, Englisch 59339 B und Deutsch 59837 B: 4000 Pieces (3740 NORMAL, 1 UNKNOWN, 3 CONTROL, 256 BYTE), TrainerSpec vocab_size 4000, byte_fallback true, unk_id 0, bos_id 1, eos_id 2, pad_id 3, NormalizerSpec add_dummy_prefix true, remove_extra_whitespaces false.",
-      "2026-10-29: Voice-Embeddings verifiziert, base64 der float16-Rohbytes, Shape aus pocket_tts_config.voices, Laengen passen: alba/cosette/marius/javert [126,1024], anna [159,1024], michael [148,1024], english-ipa zusaetzlich omer [47,1024] und liat [96,1024], deutsch juergen [127,1024] und alba [126,1024].",
-      "2026-10-29: HF-Bestand ueber https://huggingface.co/api/models/thewh1teagle/pocket-tts-onnx/tree/main?recursive=true geprueft (42 Eintraege): Root .gitattributes, README.md, pocket-tts-english.onnx, pocket-tts-english-ipa.onnx, renikud.onnx (20620594); Ordner de|en|es|fr|he|it|pt mit model.onnx, encoder.onnx, assets.json, manifest.json, renikud.onnx zusaetzlich in en/ und he/.",
-      "2026-10-29: GitHub-Release models-v1.0 (2026-08-28, Repo thewh1teagle/pocket-tts-onnx) ueber die API geprueft: assets.json, encoder.onnx, manifest.json, model.onnx, pocket-tts-english-ipa.onnx, pocket-tts-english.onnx, renikud.onnx. Eine deutsche Single-File-Datei gibt es weder im HF-Repo noch im Release.",
-      "2026-10-29: Deutsche Aktivierung belegt: languages.ts::LANGUAGES (german, model 'de/', voice 'juergen', published true), options.ts::resolveOptions (MODELS_URL plus Sprachordner), pipeline.ts::Pipeline.load (manifest.json, model.onnx, assets.json); der Python-Weg PocketTTS.from_pretrained('german') erzeugt in hub.py::model_filename den Namen pocket-tts-german.onnx, der im HF-Repo fehlt.",
-      "2026-10-29: Deutscher Encoder de/encoder.onnx (39183564 B, sha256 80e0efae03c43e2ca1252874095fa1df4a2f36c5140246c9349810de70abdd50) geladen und per ORT-C-API geprueft: 1 Input audio float32 [1,1,-1], 1 Output cond float32 [1,-1,1024]. Protobuf-Struktur: ir_version 8, Producer pytorch, Opset ai.onnx 17, 553 Nodes, 45 Initializers, Magic 08 08 12 07 pytorch 1a 06 2.1, keine Quantisierungs-Ops (im Unterschied zum Step-Graph mit 24 DynamicQuantizeLinear und 24 MatMulInteger). Der englische, im ONNX-Metadaten eingebettete Encoder hat dieselbe Struktur und dieselbe Bytegrösse.",
-      "2026-10-29: de/manifest.json lokal gelesen und gegen export/web.py::split_for_web und _entry geprueft: version 1, baseUrl leer, model/encoder/assets je {file, bytes, sha256 mit den ersten 16 Hex-Zeichen des sha256}, sampleRate 24000, voices alphabetisch [alba, juergen], voiceLanguages {juergen: de, alba: de}, phonemes false. Die lokal berechneten Digests stimmen mit dem Manifest ueberein: model 6ea90a844c839eb9..., encoder 80e0efae03c43e2c..., assets 771450 B mit dem in der Recherche festgehaltenen sha256 a0c0bedad0a7780f....",
-      "2026-10-29: assets.json-Schema aus export/web.py (config, tokenizer, voices) und packages/pocket-tts-onnx/src/tts.ts::Assets (config: ModelConfig, tokenizer: string, voices: Record<string,string>) belegt. Fuer die Web-Variante liefert ORT SessionGetModelMetadata am model.onnx keine Werte, Config, Tokenizer und Stimmen kommen stattdessen aus assets.json.",
-      "2026-10-29: Dauerhafte Dokumentation docs/POCKET-TTS-ONNX.md angelegt. Alle Zeilenangaben im Dokument gegen den Upstream-Quelltext geprueft, drei Korrekturen an den Zitaten (lora-Bindung tts.ts:628 statt 627, web.py-Konstanten 20-23, manifest-Dict 57-68, split_for_web 29-74, _entry 77-83). README.md verweist auf das Dokument.",
-      "2026-10-29: Vier ungenaue Formulierungen im Dokument praezisiert: Suchumfang der top-p-Suche auf die Python- und TypeScript-Dateien, Ersetzungsregel fuer doppelte Leerzeichen, Bedingung fuer die acht Vorab-Leerzeichen, Spannweite der Voice-Shapes von [47,1024] bis [159,1024].",
-      "2026-10-30: Brain-Dateien von einer parallelen Sitzung zum Thema Phonon und Kokoro geteilt. tasks.json war dadurch kein gueltiges JSON. Das fremde Task-Objekt unveraendert in das tasks-Array verschoben. Der Pocket-TTS-Record liegt zusaetzlich additiv in .brain/pocket-tts.json, damit ein weiterer Append der Parallel-Sitzung ihn nicht ueberschreibt."
-    ],
-    "sources": [
-      "/home/openchamber/dump/upstream-clones/pocket-tts/packages/pocket-tts-onnx/src/tts.ts",
-      "/home/openchamber/dump/upstream-clones/pocket-tts/packages/pocket-tts-onnx/src/sentencepiece.ts",
-      "/home/openchamber/dump/upstream-clones/pocket-tts/packages/pocket-tts-onnx/src/text.ts",
-      "/home/openchamber/dump/upstream-clones/pocket-tts/packages/pocket-tts-onnx/src/languages.ts",
-      "/home/openchamber/dump/upstream-clones/pocket-tts/packages/pocket-tts-onnx/src/options.ts",
-      "/home/openchamber/dump/upstream-clones/pocket-tts/packages/pocket-tts-onnx/src/pipeline.ts",
-      "/home/openchamber/dump/upstream-clones/pocket-tts/src/pocket_tts_onnx/tts.py",
-      "/home/openchamber/dump/upstream-clones/pocket-tts/src/pocket_tts_onnx/hub.py",
-      "/home/openchamber/dump/upstream-clones/pocket-tts/src/pocket_tts_onnx/export/export.py",
-      "/home/openchamber/dump/upstream-clones/pocket-tts/src/pocket_tts_onnx/export/web.py",
-      "/home/openchamber/dump/upstream-clones/pocket-tts/src/pocket_tts_onnx/export/step_model.py",
-      "huggingface.co/thewh1teagle/pocket-tts-onnx (tree API, README, de/assets.json, de/manifest.json, en/manifest.json)",
-      "api.github.com/repos/thewh1teagle/pocket-tts-onnx/releases"
-    ],
-    "open": [
-      "Byte-Identitaet des deutschen Encoders mit dem in pocket-tts-english.onnx eingebetteten Encoder ist lokal nicht nachweisbar, weil die englische Single-File gelöscht wurde. Struktur und Groesse stimmen: 39183564 B, ir_version 8, Producer pytorch, Opset ai.onnx 17, 553 Nodes, 45 Initializers.",
-      "Ob neben den vier dokumentierten Metadaten-Schluesseln weitere zulaessig sind, ist nicht dokumentiert. Der Export schreibt genau pocket_tts_config, pocket_tts_tokenizer, pocket_tts_encoder und pocket_tts_voice/<name>. Fuer die Web-Variante gilt: model.onnx hat 0 Metadaten, assets.json fuehrt config, tokenizer und voices.",
-      "Python und TypeScript liefern bei gleichem Seed unterschiedliche Rauschwerte, weil numpy default_rng und mulberry32 verschiedene Zufallsfolgen erzeugen. Beide skalieren mit sqrt(temperature). Fuer bitgleiche Ausgabe muesste eine der beiden Folgen festgeschrieben werden.",
-      "Die englischen Modelldateien wurden nach der Messung geloescht, das Dateisystem war zu 93 Prozent belegt. Fuer eine Portierung muessen pocket-tts-english.onnx und pocket-tts-english-ipa.onnx neu geladen werden."
-    ],
-    "next_action": "Zig-Port: Step-Graph per ORT-C-API fahren, Metadaten ueber SessionGetModelMetadata und ModelMetadataLookupCustomMetadataMap lesen, Text-Prompt-Schritt mit gates [1,0,0] und Latent-Schritt mit is_bos=1 danach laufen lassen."
-  },
-  "last": {
-    "focus": "Formatvertrag von Phonon (xn-ptts) und Kokoro fuer eine eigene Zig-Implementierung recherchieren",
+    "focus": "Exakter Modellvertrag der sherpa-onnx Kokoro-Variante kokoro-en-v0_19",
     "status": "abgeschlossen",
     "changed_files": [
       ".brain/research.json",
@@ -59,19 +8,203 @@
       ".brain/tasks.json"
     ],
     "verification": [
-      "2026-10-29: xn-ptts gelesen: ptts/src/tts_model.rs (690 Zeilen, TTSConfig ab Zeile 50, MAX_TOKENS_PER_CHUNK 50, prepare_text_prompt mit frames_after_eos 3 bei bis zu 4 Woertern sonst 1), ptts/src/plan.rs (PROMPT_SEQ_HEADROOM 512, MAX_FIT_TOKENS 200, frame_budget ceil((n/3 + 2) * frame_rate), seq_budget = n + 512 + frames), ptts/src/loader.rs (remap_key ab Zeile 15, is_unused_by_tts_model ab Zeile 47), ptts/src/mimi.rs (hop_length 120, frame_size 1920), ptts/src/wav.rs (write_header, f32 zu i16 mit 32767), ptts/src/bin/ptts/main.rs (CLI-Flags).",
-      "2026-10-29: Safetensors-Header von gradium/phonon-31m-en per HTTP-Range gelesen: 185 Tensoren, 41096035 Parameter (F32 10305313, BF16 30790722), model.safetensors 102823920 B. Tensorliste in ~/.cache/probe/phonon_tensors.txt.",
-      "2026-10-29: Release-Config gradium/phonon-31m-en gelesen: d_model 512, 6 Layer, 8 Heads, FFN 2048, GELU erf, RoPE theta 10000, frame_rate 12.5, sample_rate 24000, eos_threshold 4.0, lsd_decode_steps 1, vocab_size 4001, head_dim 64.",
-      "2026-10-29: Kokoro-ONNX ~/.config/openchamber/speech-models/kokoro-en-v0_19/model.onnx (345555491 B) mit ORT 1.22 geprueft: inputs=3 (tokens int64 [1,-1], style float32 [1,256], speed float32 [1]), outputs=1 (audio float32 [-1]).",
-      "2026-10-29: voices.bin 5755904 B = 1438976 f32 = 11 Sprecher mal 511 Style-Zeilen mal 256, Zuordnung Zeile = Tokenanzahl minus 2. tokens.txt 177 Zeilen mit 177 eindeutigen Symbolen, IDs 0 bis 173 und 175 bis 177, ID 174 unbelegt.",
-      "2026-10-29: Deutsches Kokoro-PyTorch-Modell api/src/models/v1_0/kokoro-german-v1_1-de.pth (327231582 B) mit torch gelesen: 548 Tensoren in 5 Gruppen (bert, bert_encoder, predictor, text_encoder, decoder), word_embeddings [178,128], position_embeddings [512,128], text_encoder.embedding [178,512]. Voices df_eva.pt und dm_bernd.pt je [512,1,256] float32.",
-      "2026-10-29: api/src/models/v1_0/config.json enthaelt 9 B mit 'Not Found', der HTTP-Abruf der Remote-Config antwortete mit 'Invalid username or password.'. Die Config-Werte des deutschen Modells bleiben unklar."
+      "2026-10-30: sherpa-onnx-Staende ueber die GitHub-API geprueft: Master 935e5ded3d949a8b557ac44ef4dad03a7d2038e7 vom 2026-10-29 (Refactor CI for Python tests, #4136) und Espeak-Zeitraum 6982b86c6617 vom 2025-06-20. Die Links im Bericht sind auf die SHA gepinnt, weil der Branch master weiterlaeuft.",
+      "2026-10-30: Style-Index im Quelltext belegt: row = speaker_id * 511 + (token_count - 2), token_count ist die Laenge des Tokens-Tensors inklusive PAD 0 vorne und hinten. csrc/offline-tts-kokoro-model.cc Z. 70-85 ist in beiden Staenden identisch, style_dim aus den Metadaten gleich 511,1,256.",
+      "2026-10-30: Master-Baum geprueft: 729 Dateien unter sherpa-onnx/csrc, keine piper-phonemize-lexicon.cc und keine espeak-Dateien mehr, cmake ohne piper- oder espeak-Datei, die verbliebenen piper-Dateien im Repo sind Beispielskripte fuer VITS- und Piper-Modelle. Master-Kokoro includiert symbol-table.h und tts-text-normalizer.h, ReadTokens in csrc/symbol-table.cc Z. 110-156, Lexikon-Pflicht --kokoro-lexicon in csrc/offline-tts-kokoro-impl.h Z. 570-573, PAD-Rahmen Z. 783-788.",
+      "2026-10-30: Tokenisierung im Espeak-Zeitraum belegt: PiperPhonemesToIdsKokoroOrKitten in csrc/piper-phonemize-lexicon.cc Z. 205-239 mit Start-PAD 0, je Phonem die ID, nach Punkt zusaetzlich die Space-ID, Ende-PAD 0, uebersprungenen unbekannten Phonemen und Chunk-Split ueber 510 Eintraege. ConvertTextToTokenIdsKokoroOrKitten Z. 486-512.",
+      "2026-10-30: espeak-Aufruf belegt: piper-phonemize Commit 78a788e0b719013401572d70fef372e77bff8e43 src/phonemize.cpp Z. 17-134 mit espeak_SetVoiceByName, espeak_TextToPhonemesWithTerminator, textmode espeakCHARS_AUTO, Phonememodus 0x02 fuer IPA, NFD-Normalisierung und Filter der Sprachflags. InitEspeak Z. 299-327 ruft espeak_Initialize(AUDIO_OUTPUT_SYNCHRONOUS, 0, data_dir, 0), data_dir kommt aus --kokoro-data-dir.",
+      "2026-10-30: tokens.txt geprueft: Schema <symbol> <id> mit genau einem Codepoint je Symbol, <BLNK> wird uebersprungen, Duplikate sind im Espeak-Zeitraum ein Fehler (ReadTokens Z. 72-122). Die lokale Datei ist byte-identisch mit scripts/kokoro/v0.19/generate_tokens.py, 1078 Byte, 177 Zeilen, IDs 0 bis 173 und 175 bis 177, ID 174 unbelegt, Apostroph auf 176.",
+      "2026-10-30: Modell-I/O lokal am model.onnx verifiziert: inputs tokens int64 [1,'tokens1'], style float32 [1,256], speed float32 [1], output audio float32 ['audio0']. speed geht unveraendert ins Modell, kokoro-length_scale wirkt nur bei speed gleich 1 als 1/length_scale, speed kleiner 0 wird abgelehnt.",
+      "2026-10-30: CustomMetadataMap vollstaendig gelesen: model_type kokoro, language English, has_espeak 1, sample_rate 24000, version 1, voice en-us, style_dim 511,1,256, n_speakers 11, speaker2id, id2speaker, speaker_names, model_url https://huggingface.co/hexgrad/kLegacy/, see_also https://huggingface.co/spaces/hexgrad/Kokoro-TTS, maintainer k2-fsa, comment This is kokoro v0.19 and supports only English.",
+      "2026-10-30: Stimmen 0 bis 10 belegt: af, af_bella, af_nicole, af_sarah, af_sky, am_adam, am_michael, bf_emma, bf_isabella, bm_george, bm_lewis, Reihenfolge aus scripts/kokoro/v0.19/generate_voices_bin.py Z. 7-19 mit Schreibblock Z. 29-38. voices.bin ist 5755904 Byte gleich 11 mal 511 mal 256 float32 ohne Header.",
+      "2026-10-30: Optionale Textnormalisierung im Espeak-Zeitraum belegt: --rule-fsts und --rule-fars werden in csrc/offline-tts-kokoro-impl.h Z. 38-84 und Z. 94-134 eingelesen und in Z. 224-235 angewandt, danach folgt ConvertTextToTokenIds. sherpa-onnx macht keine Wortexpansion und keine Gross-/Klein-Umformung, das macht nur die Upstream-Referenz kokoro.py mit normalize_text Z. 47-73 und phonemize Z. 94-107.",
+      "2026-10-30: Alle Codezitate per Substring-Abgleich gegen die Quelldateien geprueft. Acht Korrekturen am ersten Entwurf: Codepoint U+0289 statt U+0249 in generate_tokens.py Z. 10, zwei ausgelassene Kommentarzeilen, Write-Block Z. 29-38 statt 26-38, rule_fsts Z. 38-84 und Z. 94-134, Normalize Z. 224-235, test.py NodeArg Z. 71-75, test.py Ersetzungen Z. 147-149, preserve_punctuation in kokoro.py Z. 91-92.",
+      "2026-10-30: Herkunft der Upstream-Referenz geprueft: das GitHub-Repo hexgrad/kLegacy liefert per API 404, der Space hexgrad/Kokoro-TTS hatte in 256 Revisionen ab 2024-11-02 keine kokoro.py, das PyPI-Paket kokoro bis 0.9.4 enthaelt keine kokoro.py, und im Repo hexgrad/Kokoro gibt es keinen Commit fuer den Pfad kokoro.py. Gelesen wurde die lokale Kopie mit sha256 c75f024b69271b58e167a54b63505bb4e3d9e111bf31f156b60f8565eaa5fb46."
+    ],
+    "sources": [
+      "https://api.github.com/repos/k2-fsa/sherpa-onnx/commits/master",
+      "https://api.github.com/repos/k2-fsa/sherpa-onnx/git/trees/master?recursive=1",
+      "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/935e5ded3d949a8b557ac44ef4dad03a7d2038e7/sherpa-onnx/csrc/offline-tts-kokoro-model.cc",
+      "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/935e5ded3d949a8b557ac44ef4dad03a7d2038e7/sherpa-onnx/csrc/offline-tts-kokoro-impl.h",
+      "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/935e5ded3d949a8b557ac44ef4dad03a7d2038e7/sherpa-onnx/csrc/symbol-table.cc",
+      "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/6982b86c6617/sherpa-onnx/csrc/offline-tts-kokoro-model.cc",
+      "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/6982b86c6617/sherpa-onnx/csrc/piper-phonemize-lexicon.cc",
+      "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/6982b86c6617/sherpa-onnx/csrc/offline-tts-kokoro-impl.h",
+      "https://raw.githubusercontent.com/rhasspy/piper-phonemize/78a788e0b719013401572d70fef372e77bff8e43/src/phonemize.cpp",
+      "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/935e5ded3d949a8b557ac44ef4dad03a7d2038e7/scripts/kokoro/v0.19/generate_tokens.py",
+      "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/935e5ded3d949a8b557ac44ef4dad03a7d2038e7/scripts/kokoro/v0.19/generate_voices_bin.py",
+      "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/935e5ded3d949a8b557ac44ef4dad03a7d2038e7/scripts/kokoro/v0.19/test.py",
+      "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/935e5ded3d949a8b557ac44ef4dad03a7d2038e7/scripts/kokoro/README.md",
+      "/home/openchamber/.config/openchamber/speech-models/kokoro-en-v0_19/model.onnx",
+      "/home/openchamber/.config/openchamber/speech-models/kokoro-en-v0_19/tokens.txt",
+      "/home/openchamber/.config/openchamber/speech-models/kokoro-en-v0_19/voices.bin",
+      "/home/openchamber/.cache/kokoro-research/klegacy-v019-kokoro.py, sha256 c75f024b69271b58e167a54b63505bb4e3d9e111bf31f156b60f8565eaa5fb46, Upstream hexgrad/kLegacy nicht mehr erreichbar",
+      "/home/openchamber/.cache/kokoro-research/meta_parse.py, eigener Protobuf-Parser fuer die ONNX-CustomMetadataMap",
+      "/home/openchamber/.cache/kokoro-research/finding-kokoro-v019.md, Recherche-Notiz mit allen belegten Zitaten"
     ],
     "open": [
-      "Die Config-Werte des deutschen Kokoro-PyTorch-Modells (vocab, n_token, style_dim) sind unklar, lokal nur die Tensorformen des State-Dict.",
-      "Die GGUF-Dateigroessen von gradium/phonon-31m-en (q8 64512352 B, q4k 55075168 B) stammen aus dem HF-Dateilisting, die Dateien selbst wurden nicht geladen.",
-      "Das Layout von voices.bin wurde aus dem sherpa-onnx-Quelltext abgeleitet, der lokal nicht vorliegt. Nur Groesse und Sprecherzahl sind lokal gemessen."
+      "Keine Audioausgabe erzeugt. Ein Build von sherpa-onnx war nicht Teil des Auftrags, der Modellvertrag ist aus Quelltext, Metadaten und Binaerdateien abgeleitet.",
+      "Die Upstream-Referenz kokoro.py ist online nicht mehr auffindbar. Das GitHub-Repo hexgrad/kLegacy liefert 404, es liegt nur eine lokale Kopie mit sha256 c75f024b69271b58 vor.",
+      "sherpa-onnx hat den Kokoro-Tokenisierungsweg gewechselt. Der Espeak-Zeitraum passt zum lokalen Asset-Set mit espeak-ng-data, der Master verlangt ein Lexikon. Fuer den Zig-Port ist ein Stand festzulegen."
     ],
-    "next_action": "Zig-Port auf Basis des verifizierten Vertrags: Safetensors-Loader mit remap_key, Mimi-Dekoder mit frame_rate 12.5 und sample_rate 24000, WAV-Ausgabe mit 16-Bit-PCM, bei Kokoro-ONNX zusaetzlich Style- und Speed-Input."
-  }
+    "next_action": "Fuer den Zig-Port den Espeak-Zeitraum-Pfad nachbilden: tokens.txt lesen, Text mit espeak in IPA uebersetzen, Tokens mit PAD 0 vorne und hinten setzen, Style-Zeile nach speaker_id mal 511 plus token_count minus 2 bestimmen, Style-Vektor aus voices.bin bei Offset (speaker_id mal 511 plus token_count minus 2) mal 256 float32 lesen, speed unveraendert reichen, Audio mit 24000 Hz schreiben. Alternativ den Master-Stand mit Lexikon nachbauen."
+  },
+  "last": {
+    "focus": "Phonemisierungsvertrag von piper1-gpl: espeak-ng-Aufrufe, Terminatoren, NFD-Zerlegung, phoneme_id_map, ID-Folge und ONNX-Eingaben",
+    "status": "abgeschlossen",
+    "changed_files": [
+      ".brain/research.json",
+      ".brain/tasks.json",
+      "docs/PIPER-PHONEMIZATION.md"
+    ],
+    "verification": [
+      "2026-10-30: piper1-gpl main auf Commit 74ac24e7e8e2e57a5e1fada5505c74e3d9c1843a vom 2026-10-23 per GitHub-API bestaetigt. Alle Quellpfade live mit HTTP 200 abgerufen und lokal unter /tmp/opencode/piper-research abgelegt.",
+      "2026-10-30: src/piper/espeakbridge.c gelesen: espeak_Initialize(AUDIO_OUTPUT_SYNCHRONOUS, 0, data_dir, 0) mit Fehler bei Rueckgabe kleiner 0, espeak_SetVoiceByName(voice) mit Fehler wenn ungleich EE_OK, Schleife while (text != NULL) mit espeak_TextToPhonemesWithTerminator((const void **)&text, espeakCHARS_AUTO, espeakPHONEMES_IPA, &terminator), Maske terminator &= 0x000FFFFF, Zuordnung CLAUSE_PERIOD Punkt, CLAUSE_QUESTION Fragezeichen, CLAUSE_EXCLAMATION Ausrufezeichen, CLAUSE_COMMA Komma, CLAUSE_COLON Doppelpunkt, CLAUSE_SEMICOLON Semikolon.",
+      "2026-10-30: espeak-ng Commit 724808c gelesen: src/libespeak-ng/speech.c Z. 855-873 ruft TranslateClauseWithTerminator und setzt *textptr auf text_decoder_get_buffer, bei EOF liefert der Decoder NULL. src/libespeak-ng/dictionary.c Z. 438 und 560-687 belegen, dass die Rueckgabe der statische Puffer phon_out_buf ist und nicht freigegeben werden darf.",
+      "2026-10-30: src/piper/phonemize_espeak.py gelesen: Sprachflags per Regex \\([^)]+\\) entfernt, Terminator angehaengt, bei Komma, Doppelpunkt und Semikolon zusaetzlich Leerzeichen, Zerlegung list(unicodedata.normalize(\"NFD\", phonemes_str)) also codepointweise, Satzgrenze ueber end_of_sentence, Diphthong-Merge ueber _merge_known_vowel_clusters bei gesetzter vowel_clusters-Liste.",
+      "2026-10-30: libpiper/src/piper.cpp gelesen: Sprachflags ueber die Zustandsmaschine in_lang_flag, Terminatorzeichen Komma, Doppelpunkt und Semikolon mit eingebautem Leerzeichen, NFD ueber una::norm::to_nfd_utf8, Iteration ueber una::ranges::utf8_view, kein vowel_clusters im File.",
+      "2026-10-30: src/piper/phoneme_ids.py und src/piper/const.py gelesen: BOS ^ mit ID 1, PAD _ mit ID 0, EOS $ mit ID 2, ID-Folge je Satz BOS, PAD, je Phonem alle Map-IDs gefolgt von PAD, am Ende EOS. Unbekanntes Phonem erzeugt die Warnung \"Missing phoneme from id map: %s\" und wird uebersprungen.",
+      "2026-10-30: libpiper/include/piper_impl.hpp und libpiper/src/piper.cpp gelesen: ID_PAD 0, ID_BOS 1, ID_EOS 2, PHONEME_SEPARATOR 0, Map-Indexierung ueber get_codepoint also den ersten Codepoint des JSON-Schluessels, alle IDs eines Keys werden per push_back an denselben Codepoint gehaengt, der Pinyin-Zweig nutzt dagegen exakte String-Keys. Unbekannte Phoneme werden im C++-Pfad ohne Meldung verworfen.",
+      "2026-10-30: src/piper/voice.py gelesen: input int64 [1, N], input_lengths int64 [1] mit N, scales float32 [3] in der Reihenfolge noise_scale, length_scale, noise_w_scale, sid int64 [1] nur bei num_speakers groesser 1. Die Schleife for phonemes in sentence_phonemes in synthesize startet je Satz genau einen session.run.",
+      "2026-10-30: src/piper/config.py, src/piper/train/export_onnx.py und src/piper/train/vits/models.py gelesen: Defaults noise_scale 0.667, length_scale 1.0, noise_w_scale 0.8, hop_length 256, Export-Defaults [0.667, 1.0, 0.8], Formel w = torch.exp(logw) * x_mask * length_scale, length_scale wird also nicht invertiert.",
+      "2026-10-30: tests/test_voice.onnx.json programmatisch ausgewertet: 159 Schluessel in phoneme_id_map, Semikolon ID 12, Komma ID 8, Punkt ID 10, Diphthonge aɪ 161, aʊ 162, ɔɪ 163, eɪ 164, oʊ 165, inference.noise_w 0.8, num_speakers 1. DEFAULT_PHONEME_ID_MAP in src/piper/phoneme_ids.py hat 165 Schluessel mit den IDs 0 bis 165, ID 150 bleibt unbelegt.",
+      "2026-10-30: espeak-ng Tags 1.52.0 und 1.51 ohne espeak_TextToPhonemesWithTerminator geprueft, Commit 724808c und master mit der Funktion. piper1-gpl CMakeLists.txt baut espeak-ng per ExternalProject aus GIT_TAG 724808c und kopiert das Verzeichnis espeak-ng-data nach src/piper/espeak-ng-data.",
+      "2026-10-30: Historische Referenzen gelesen: rhasspy/piper-phonemize master src/phonemize.cpp mit demselben espeak-Aufruf und phonemize_eSpeak, rhasspy/piper master src/cpp/piper.cpp mit den Warnungen \"Missing {} phoneme(s) from phoneme/id map!\" und \"Missing \\\"{}\\\" (\\u{:04X}): {} time(s)\".",
+      "2026-10-30: Abschlusslauf: const.py, phoneme_ids.py, voice.py, piper.cpp, piper_impl.hpp, espeakbridge.c, phonemize_espeak.py und CMakeLists.txt erneut lokal gelesen und die Werte der Antwort 1 bis 6 daraus abgeleitet. Kein Projektcode fuer die Laufzeit geaendert.",
+      "2026-10-30: Der Laufzeitvertrag steht in docs/PIPER-PHONEMIZATION.md. Ein Pruefskript hat 58 Datei-und-Zeilen-Angaben des Dokuments gegen die lokale Quellkopie geprueft, 0 Abweichungen."
+    ],
+    "sources": [
+      "https://raw.githubusercontent.com/OHF-Voice/piper1-gpl/main/src/piper/espeakbridge.c",
+      "https://raw.githubusercontent.com/OHF-Voice/piper1-gpl/main/src/piper/phonemize_espeak.py",
+      "https://raw.githubusercontent.com/OHF-Voice/piper1-gpl/main/src/piper/phoneme_ids.py",
+      "https://raw.githubusercontent.com/OHF-Voice/piper1-gpl/main/src/piper/const.py",
+      "https://raw.githubusercontent.com/OHF-Voice/piper1-gpl/main/src/piper/voice.py",
+      "https://raw.githubusercontent.com/OHF-Voice/piper1-gpl/main/src/piper/config.py",
+      "https://raw.githubusercontent.com/OHF-Voice/piper1-gpl/main/libpiper/src/piper.cpp",
+      "https://raw.githubusercontent.com/OHF-Voice/piper1-gpl/main/libpiper/include/piper_impl.hpp",
+      "https://raw.githubusercontent.com/OHF-Voice/piper1-gpl/main/src/piper/train/export_onnx.py",
+      "https://raw.githubusercontent.com/OHF-Voice/piper1-gpl/main/src/piper/train/vits/models.py",
+      "https://raw.githubusercontent.com/OHF-Voice/piper1-gpl/main/tests/test_voice.onnx.json",
+      "https://raw.githubusercontent.com/OHF-Voice/piper1-gpl/main/CMakeLists.txt",
+      "https://raw.githubusercontent.com/rhasspy/piper-phonemize/master/src/phonemize.cpp",
+      "https://raw.githubusercontent.com/rhasspy/piper/master/src/cpp/piper.cpp",
+      "https://raw.githubusercontent.com/espeak-ng/espeak-ng/724808c/src/libespeak-ng/speech.c",
+      "https://raw.githubusercontent.com/espeak-ng/espeak-ng/724808c/src/libespeak-ng/dictionary.c",
+      "https://raw.githubusercontent.com/espeak-ng/espeak-ng/724808c/src/include/espeak-ng/speak_lib.h",
+      "https://raw.githubusercontent.com/espeak-ng/espeak-ng/master/src/libespeak-ng/translate.h",
+      "https://raw.githubusercontent.com/espeak-ng/espeak-ng/master/src/libespeak-ng/encoding.c",
+      "https://raw.githubusercontent.com/espeak-ng/espeak-ng/master/src/libespeak-ng/readclause.c",
+      "https://api.github.com/repos/OHF-Voice/piper1-gpl/commits/main",
+      "/tmp/opencode/piper-research, lokale Kopie der gelesenen Quellen"
+    ],
+    "open": [
+      "Nicht verifiziert: ob espeak_Initialize mehrfach pro Prozess aufgerufen werden darf. Die Quelle ruft es beim Erzeugen des Synthesizers auf, ein Verbot steht dort nicht.",
+      "Nicht verifiziert: dass die ONNX-Eingabenamen bei jedem fremden Piper-Modell gleich heissen. Belegt sind der Trainings-Export und der piper1-gpl-Inferenzpfad.",
+      "Nicht verifiziert: die Aussprachequalitaet der espeak-ng-Stimmen fuer eine konkrete Zielsprache. Die Quellen enthalten nur die Aufrufmechanik.",
+      "Nicht verifiziert: warum die Modelle die NFD-Zerlegung erwarten. Belegt ist, dass Piper sie anwendet."
+    ],
+    "next_action": "Fuer den Zig-Port einen der beiden Piper-Pfade festlegen, empfohlen die Python-Semantik mit exaktem String-Key-Lookup, Warnung bei fehlendem Phonem und einem PAD je Phonem. espeak-ng ab Commit 724808c bereitstellen und espeak-ng-data mitliefern, Terminator mit 0x000FFFFF maskieren, Satzgrenze ueber CLAUSE_TYPE_SENTENCE 0x00080000 bestimmen, length_scale nicht invertieren. Vertrag und Quellenzeilen stehen in docs/PIPER-PHONEMIZATION.md."
+  },
+  "history": [
+    {
+      "focus": "PocketTTS-ONNX-Vertrag an echten Dateien: Inferenz, Tokenizer, Encoder, Step-Zustaende, Audio, EOS, Referenzdateien",
+      "status": "abgeschlossen",
+      "changed_files": [
+        ".brain/research.json",
+        ".brain/tasks.json",
+        ".brain/memory.json"
+      ],
+      "verification": [
+        "2026-10-30: pocket-tts-english.onnx per ORT 1.22 C-API geprueft: 12 Eingänge, 7 Ausgänge. Namen und Shapes: tokens int64 [1,-1], latent float32 [1,-1,32], is_bos float32 [1,-1,1], cond float32 [1,-1,1024], gates float32 [3], noise float32 [1,32], flow_kv float32 [-1,6,2,1,16,64], flow_offset int64 Skalar, mimi_kv float32 [266,2,2,1,8,64], mimi_offset int64 Skalar, mimi_conv float32 [14720], decode_steps float32 Skalar. Ausgänge: audio float32 [1,1,1920], next_latent float32 [1,1,32], eos_logit float32 [1,1], flow_kv_new float32 [-1,6,2,1,16,64], mimi_kv_new float32 [16,2,2,1,8,64], mimi_offset_out int64 Skalar, mimi_conv_out float32 [14720].",
+        "2026-10-30: pocket-tts-english-ipa.onnx hat 13 Eingänge, der zusätzliche Eingang lora ist float32 als Skalar.",
+        "2026-10-30: Metadaten der englischen Single-File gemessen: pocket_tts_config 779 B JSON, pocket_tts_tokenizer 79120 B base64 gleich 59339 B Proto, pocket_tts_encoder 52244752 B base64 gleich 39183564 B ONNX, sechs Voice-Blobs pocket_tts_voice/<name>.",
+        "2026-10-30: Voice-Shapes aus pocket_tts_config: alba, cosette, javert, marius je [126,1024], anna [159,1024], michael [148,1024]. Die Blobs sind float16-Rohbytes, alba 258048 B gleich 129024 float16-Werte gleich 126 mal 1024.",
+        "2026-10-30: SentencePiece-Proto der englischen Datei per eigenem Parser gelesen: Top-Level-Felder 1 mit 4000 Pieces, 2 TrainerSpec, 3 NormalizerSpec. Feld 4 ist im Modell nicht belegt und laut Schema in sentencepiece_model.proto reserviert. Piece-Typen: 3740 NORMAL, 1 UNKNOWN, 3 CONTROL, 256 BYTE. IDs: <unk> 0, <s> 1, </s> 2, <pad> 3, Byte-Pieces 4 bis 259, Metazeichen 260.",
+        "2026-10-30: TrainerSpec: model_type 1 UNIGRAM, vocab_size 4000, character_coverage 0.9994999766349792, max_sentencepiece_length 6, byte_fallback true, unk_id 0, bos_id 1, eos_id 2, pad_id 3. Korrektur einer frueheren Notiz, die 32 nannte.",
+        "2026-10-30: NormalizerSpec: name identity, precompiled_charsmap leer, add_dummy_prefix 1, remove_extra_whitespaces 0, escape_whitespaces nicht serialisiert, also Default true.",
+        "2026-10-30: TypeScript-Parser belegt: packages/pocket-tts-onnx/src/sentencepiece.ts:88-90 liest add_dummy_prefix aus Top-Level-Feld 4, das nie belegt ist. Die korrekte Funktion parseNormalizer in Zeile 114-125 liest Feld 3 von NormalizerSpec, wird aber nie aufgerufen. Ein synthetisches Proto mit add_dummy_prefix gleich false liefert im TS-Parser weiterhin true.",
+        "2026-10-30: Encoder per ORT-C-API gefahren, en-encoder.onnx und de-encoder.onnx liefern cond float32 [1,frames,1024] mit frames gleich floor(samples/1920) plus 1. Gemessen: 1920 Samples gleich 2 Frames, 5760 gleich 4, 19200 gleich 11, 5000 gleich 3. Cond-Zeile 0 ist ueber verschiedene Audioinhalte bitgleich, Differenz 0.0, Zeile 1 ist inhaltsabhaengig mit Differenz 1.14 beim englischen und 2.53 beim deutschen Encoder.",
+        "2026-10-30: pip install sentencepiece scheitert an voller tmpfs unter /tmp, Fehler OSError Errno 28. Ein Token-ID-Vergleich gegen das echte sentencepiece-Paket war deshalb nicht moeglich. Der TS-Tokenizer wurde per eigener Python-Nachbildung am echten Proto geprueft.",
+        "2026-10-30: Keine Projektdatei fuer die Laufzeit geaendert. Probe-Artefakte liegen unter /home/openchamber/.cache/probe/, die Metadaten- und Proto-Auswertung unter /tmp/opencode/sp_verify.py."
+      ],
+      "sources": [
+        "/home/openchamber/dump/upstream-clones/pocket-tts/src/pocket_tts_onnx/tts.py",
+        "/home/openchamber/dump/upstream-clones/pocket-tts/src/pocket_tts_onnx/text.py",
+        "/home/openchamber/dump/upstream-clones/pocket-tts/src/pocket_tts_onnx/audio.py",
+        "/home/openchamber/dump/upstream-clones/pocket-tts/src/pocket_tts_onnx/export/step_model.py",
+        "/home/openchamber/dump/upstream-clones/pocket-tts/src/pocket_tts_onnx/export/export.py",
+        "/home/openchamber/dump/upstream-clones/pocket-tts/packages/pocket-tts-onnx/src/sentencepiece.ts",
+        "/home/openchamber/dump/upstream-clones/pocket-tts/packages/pocket-tts-onnx/src/tts.ts",
+        "/home/openchamber/dump/upstream-clones/pocket-tts/packages/pocket-tts-onnx/src/text.ts",
+        "/home/openchamber/dump/upstream-clones/pocket-tts/packages/pocket-tts-onnx/src/wav.ts",
+        "/home/openchamber/dump/upstream-clones/pocket-tts/examples/english.py",
+        "/home/openchamber/dump/upstream-clones/pocket-tts/packages/pocket-tts-onnx/examples/english.ts",
+        "/home/openchamber/dump/pocket-research/pocket-tts-english.onnx",
+        "/home/openchamber/dump/pocket-research/pocket-tts-english-ipa.onnx",
+        "/home/openchamber/dump/pocket-research/en-encoder.onnx",
+        "/home/openchamber/dump/pocket-research/de-encoder.onnx",
+        "https://raw.githubusercontent.com/google/sentencepiece/master/src/sentencepiece_model.proto",
+        "/home/openchamber/.cache/probe/onnx_io.c",
+        "/home/openchamber/.cache/probe/enc_run.c",
+        "/tmp/opencode/sp_verify.py"
+      ],
+      "open": [
+        "Token-IDs sind nicht gegen das echte sentencepiece-Paket verglichen, die Installation scheitert an voller tmpfs unter /tmp mit Errno 28. Geprueft wurde die TypeScript-Nachbildung am echten Proto.",
+        "Der TypeScript-Parser liest add_dummy_prefix aus Top-Level-Feld 4 statt aus NormalizerSpec Feld 3. Fuer das aktuelle Modell ist das verhaltensgleich, weil das Modell add_dummy_prefix true serialisiert. Bei einem Modell mit false wuerde die TS-Laufzeit den Dummy-Prefix trotzdem setzen.",
+        "Python mit numpy default_rng und TypeScript mit mulberry32 liefern bei gleichem Seed verschiedene Rauschfolgen. Beide skalieren mit sqrt(temperature).",
+        "docs/POCKET-TTS-ONNX.md nennt beim Tokenizer add_dummy_prefix ohne Feldangabe und nennt die Encoder-Framezahl nicht. Der Bericht nennt die korrigierten Stellen."
+      ],
+      "next_action": "Bericht als Grundlage fuer den Zig-Port nutzen. In docs/POCKET-TTS-ONNX.md drei Stellen nachziehen: Feld-4-Bug im TypeScript-Tokenizer, max_sentencepiece_length gleich 6 und die Encoder-Relation cond Frames gleich floor(samples/1920) plus 1 mit inhaltsunabhaengiger Zeile 0."
+    },
+    {
+      "focus": "Exakter Modellvertrag der sherpa-onnx Kokoro-Variante kokoro-en-v0_19",
+      "status": "abgeschlossen",
+      "changed_files": [
+        ".brain/research.json",
+        ".brain/memory.json",
+        ".brain/tasks.json"
+      ],
+      "verification": [
+        "2026-10-30: sherpa-onnx-Staende ueber die GitHub-API geprueft: Master 935e5ded3d949a8b557ac44ef4dad03a7d2038e7 vom 2026-10-29 (Refactor CI for Python tests, #4136) und Espeak-Zeitraum 6982b86c6617 vom 2025-06-20. Die Links im Bericht sind auf die SHA gepinnt, weil der Branch master weiterlaeuft.",
+        "2026-10-30: Style-Index im Quelltext belegt: row = speaker_id * 511 + (token_count - 2), token_count ist die Laenge des Tokens-Tensors inklusive PAD 0 vorne und hinten. csrc/offline-tts-kokoro-model.cc Z. 70-85 ist in beiden Staenden identisch, style_dim aus den Metadaten gleich 511,1,256.",
+        "2026-10-30: Master-Baum geprueft: 729 Dateien unter sherpa-onnx/csrc, keine piper-phonemize-lexicon.cc und keine espeak-Dateien mehr, cmake ohne piper- oder espeak-Datei, die verbliebenen piper-Dateien im Repo sind Beispielskripte fuer VITS- und Piper-Modelle. Master-Kokoro includiert symbol-table.h und tts-text-normalizer.h, ReadTokens in csrc/symbol-table.cc Z. 110-156, Lexikon-Pflicht --kokoro-lexicon in csrc/offline-tts-kokoro-impl.h Z. 570-573, PAD-Rahmen Z. 783-788.",
+        "2026-10-30: Tokenisierung im Espeak-Zeitraum belegt: PiperPhonemesToIdsKokoroOrKitten in csrc/piper-phonemize-lexicon.cc Z. 205-239 mit Start-PAD 0, je Phonem die ID, nach Punkt zusaetzlich die Space-ID, Ende-PAD 0, uebersprungenen unbekannten Phonemen und Chunk-Split ueber 510 Eintraege. ConvertTextToTokenIdsKokoroOrKitten Z. 486-512.",
+        "2026-10-30: espeak-Aufruf belegt: piper-phonemize Commit 78a788e0b719013401572d70fef372e77bff8e43 src/phonemize.cpp Z. 17-134 mit espeak_SetVoiceByName, espeak_TextToPhonemesWithTerminator, textmode espeakCHARS_AUTO, Phonememodus 0x02 fuer IPA, NFD-Normalisierung und Filter der Sprachflags. InitEspeak Z. 299-327 ruft espeak_Initialize(AUDIO_OUTPUT_SYNCHRONOUS, 0, data_dir, 0), data_dir kommt aus --kokoro-data-dir.",
+        "2026-10-30: tokens.txt geprueft: Schema <symbol> <id> mit genau einem Codepoint je Symbol, <BLNK> wird uebersprungen, Duplikate sind im Espeak-Zeitraum ein Fehler (ReadTokens Z. 72-122). Die lokale Datei ist byte-identisch mit scripts/kokoro/v0.19/generate_tokens.py, 1078 Byte, 177 Zeilen, IDs 0 bis 173 und 175 bis 177, ID 174 unbelegt, Apostroph auf 176.",
+        "2026-10-30: Modell-I/O lokal am model.onnx verifiziert: inputs tokens int64 [1,'tokens1'], style float32 [1,256], speed float32 [1], output audio float32 ['audio0']. speed geht unveraendert ins Modell, kokoro-length_scale wirkt nur bei speed gleich 1 als 1/length_scale, speed kleiner 0 wird abgelehnt.",
+        "2026-10-30: CustomMetadataMap vollstaendig gelesen: model_type kokoro, language English, has_espeak 1, sample_rate 24000, version 1, voice en-us, style_dim 511,1,256, n_speakers 11, speaker2id, id2speaker, speaker_names, model_url https://huggingface.co/hexgrad/kLegacy/, see_also https://huggingface.co/spaces/hexgrad/Kokoro-TTS, maintainer k2-fsa, comment This is kokoro v0.19 and supports only English.",
+        "2026-10-30: Stimmen 0 bis 10 belegt: af, af_bella, af_nicole, af_sarah, af_sky, am_adam, am_michael, bf_emma, bf_isabella, bm_george, bm_lewis, Reihenfolge aus scripts/kokoro/v0.19/generate_voices_bin.py Z. 7-19 mit Schreibblock Z. 29-38. voices.bin ist 5755904 Byte gleich 11 mal 511 mal 256 float32 ohne Header.",
+        "2026-10-30: Optionale Textnormalisierung im Espeak-Zeitraum belegt: --rule-fsts und --rule-fars werden in csrc/offline-tts-kokoro-impl.h Z. 38-84 und Z. 94-134 eingelesen und in Z. 224-235 angewandt, danach folgt ConvertTextToTokenIds. sherpa-onnx macht keine Wortexpansion und keine Gross-/Klein-Umformung, das macht nur die Upstream-Referenz kokoro.py mit normalize_text Z. 47-73 und phonemize Z. 94-107.",
+        "2026-10-30: Alle Codezitate per Substring-Abgleich gegen die Quelldateien geprueft. Acht Korrekturen am ersten Entwurf: Codepoint U+0289 statt U+0249 in generate_tokens.py Z. 10, zwei ausgelassene Kommentarzeilen, Write-Block Z. 29-38 statt 26-38, rule_fsts Z. 38-84 und Z. 94-134, Normalize Z. 224-235, test.py NodeArg Z. 71-75, test.py Ersetzungen Z. 147-149, preserve_punctuation in kokoro.py Z. 91-92.",
+        "2026-10-30: Herkunft der Upstream-Referenz geprueft: das GitHub-Repo hexgrad/kLegacy liefert per API 404, der Space hexgrad/Kokoro-TTS hatte in 256 Revisionen ab 2024-11-02 keine kokoro.py, das PyPI-Paket kokoro bis 0.9.4 enthaelt keine kokoro.py, und im Repo hexgrad/Kokoro gibt es keinen Commit fuer den Pfad kokoro.py. Gelesen wurde die lokale Kopie mit sha256 c75f024b69271b58e167a54b63505bb4e3d9e111bf31f156b60f8565eaa5fb46."
+      ],
+      "sources": [
+        "https://api.github.com/repos/k2-fsa/sherpa-onnx/commits/master",
+        "https://api.github.com/repos/k2-fsa/sherpa-onnx/git/trees/master?recursive=1",
+        "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/935e5ded3d949a8b557ac44ef4dad03a7d2038e7/sherpa-onnx/csrc/offline-tts-kokoro-model.cc",
+        "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/935e5ded3d949a8b557ac44ef4dad03a7d2038e7/sherpa-onnx/csrc/offline-tts-kokoro-impl.h",
+        "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/935e5ded3d949a8b557ac44ef4dad03a7d2038e7/sherpa-onnx/csrc/symbol-table.cc",
+        "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/6982b86c6617/sherpa-onnx/csrc/offline-tts-kokoro-model.cc",
+        "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/6982b86c6617/sherpa-onnx/csrc/piper-phonemize-lexicon.cc",
+        "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/6982b86c6617/sherpa-onnx/csrc/offline-tts-kokoro-impl.h",
+        "https://raw.githubusercontent.com/rhasspy/piper-phonemize/78a788e0b719013401572d70fef372e77bff8e43/src/phonemize.cpp",
+        "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/935e5ded3d949a8b557ac44ef4dad03a7d2038e7/scripts/kokoro/v0.19/generate_tokens.py",
+        "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/935e5ded3d949a8b557ac44ef4dad03a7d2038e7/scripts/kokoro/v0.19/generate_voices_bin.py",
+        "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/935e5ded3d949a8b557ac44ef4dad03a7d2038e7/scripts/kokoro/v0.19/test.py",
+        "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/935e5ded3d949a8b557ac44ef4dad03a7d2038e7/scripts/kokoro/README.md",
+        "/home/openchamber/.config/openchamber/speech-models/kokoro-en-v0_19/model.onnx",
+        "/home/openchamber/.config/openchamber/speech-models/kokoro-en-v0_19/tokens.txt",
+        "/home/openchamber/.config/openchamber/speech-models/kokoro-en-v0_19/voices.bin",
+        "/home/openchamber/.cache/kokoro-research/klegacy-v019-kokoro.py, sha256 c75f024b69271b58e167a54b63505bb4e3d9e111bf31f156b60f8565eaa5fb46, Upstream hexgrad/kLegacy nicht mehr erreichbar",
+        "/home/openchamber/.cache/kokoro-research/meta_parse.py, eigener Protobuf-Parser fuer die ONNX-CustomMetadataMap",
+        "/home/openchamber/.cache/kokoro-research/finding-kokoro-v019.md, Recherche-Notiz mit allen belegten Zitaten"
+      ],
+      "open": [
+        "Keine Audioausgabe erzeugt. Ein Build von sherpa-onnx war nicht Teil des Auftrags, der Modellvertrag ist aus Quelltext, Metadaten und Binaerdateien abgeleitet.",
+        "Die Upstream-Referenz kokoro.py ist online nicht mehr auffindbar. Das GitHub-Repo hexgrad/kLegacy liefert 404, es liegt nur eine lokale Kopie mit sha256 c75f024b69271b58 vor.",
+        "sherpa-onnx hat den Kokoro-Tokenisierungsweg gewechselt. Der Espeak-Zeitraum passt zum lokalen Asset-Set mit espeak-ng-data, der Master verlangt ein Lexikon. Fuer den Zig-Port ist ein Stand festzulegen."
+      ],
+      "next_action": "Fuer den Zig-Port den Espeak-Zeitraum-Pfad nachbilden: tokens.txt lesen, Text mit espeak in IPA uebersetzen, Tokens mit PAD 0 vorne und hinten setzen, Style-Zeile nach speaker_id mal 511 plus token_count minus 2 bestimmen, Style-Vektor aus voices.bin bei Offset (speaker_id mal 511 plus token_count minus 2) mal 256 float32 lesen, speed unveraendert reichen, Audio mit 24000 Hz schreiben. Alternativ den Master-Stand mit Lexikon nachbauen."
+    }
+  ]
 }

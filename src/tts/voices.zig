@@ -1,11 +1,16 @@
-//! Stimmdaten aus `voices.npz` lesen.
+//! Stimmdaten aus `voices.npz` und `voices.bin` lesen.
 //!
 //! Die Kitten-Modelle liefern ihre Stimmembeddings als ZIP-Archiv mit
 //! eingebetteten NPY-Dateien. Die Eintraege sind unkomprimiert gespeichert,
 //! deshalb reicht ein eigener ZIP-Leser ohne Inflate-Implementierung.
+//!
+//! Die Kokoro-Modelle liefern dieselben Daten ohne Kopf als flache Datei mit
+//! little-endian Float32-Werten. Namen der Stimmen und Groesse des
+//! Embeddings liefert dort der Aufrufer.
 const std = @import("std");
 
-const max_archive_bytes = 256 * 1024 * 1024;
+/// Obergrenze fuer geladene Stimmdaten in Byte.
+const max_voice_bytes = 256 * 1024 * 1024;
 const max_entries = 256;
 
 const signature_eocd: u32 = 0x06054b50;
@@ -58,7 +63,7 @@ pub const Voices = struct {
 
 /// Liest alle Stimmembeddings aus einem NPZ-Archiv.
 pub fn load(gpa: std.mem.Allocator, io: std.Io, path: []const u8) !Voices {
-    const data = try std.Io.Dir.readFileAlloc(.cwd(), io, path, gpa, .limited(max_archive_bytes));
+    const data = try std.Io.Dir.readFileAlloc(.cwd(), io, path, gpa, .limited(max_voice_bytes));
     defer gpa.free(data);
 
     const count = try countEntries(data);
@@ -73,7 +78,7 @@ pub fn load(gpa: std.mem.Allocator, io: std.Io, path: []const u8) !Voices {
     }
 
     var offset = try centralDirectoryOffset(data);
-    for (0..count) |index| {
+    for (0..count) |_| {
         const header = try readCentralHeader(data, offset);
         offset = header.next_offset;
 
@@ -113,6 +118,89 @@ pub fn load(gpa: std.mem.Allocator, io: std.Io, path: []const u8) !Voices {
     }
 
     return .{ .gpa = gpa, .entries = entries[0..filled] };
+}
+
+/// Liest Stimmembeddings aus einer flachen Datei mit little-endian Float32-Werten.
+///
+/// Die Datei hat keinen Kopf. Die Werte stehen hintereinander in der Reihenfolge
+/// der Stimmen, jede Stimme belegt `rows` Zeilen mit je `columns` Werten.
+///
+/// Die Dateigroesse muss exakt zu den Stimmen passen. Eine zu kleine Datei
+/// ergibt `error.TruncatedArray`, eine zu grosse `error.InvalidFileSize`.
+pub fn loadFlatBin(
+    gpa: std.mem.Allocator,
+    io: std.Io,
+    path: []const u8,
+    speakers: []const []const u8,
+    rows: usize,
+    columns: usize,
+) !Voices {
+    if (speakers.len == 0) return error.NoSpeakers;
+    if (rows == 0 or columns == 0) return error.UnsupportedShape;
+
+    const values_per_voice = std.math.mul(usize, rows, columns) catch return error.AudioTooLarge;
+    const bytes_per_voice = std.math.mul(usize, values_per_voice, @sizeOf(f32)) catch return error.AudioTooLarge;
+    const expected = std.math.mul(usize, bytes_per_voice, speakers.len) catch return error.AudioTooLarge;
+    if (expected > max_voice_bytes) return error.AudioTooLarge;
+
+    // Ein Byte mehr erlaubt, eine zu kleine Datei von einer zu grossen zu
+    // unterscheiden, ohne die ganze Datei im Speicher zu halten.
+    const data = std.Io.Dir.readFileAlloc(.cwd(), io, path, gpa, .limited(expected + 1)) catch |err| switch (err) {
+        error.StreamTooLong => return error.InvalidFileSize,
+        else => return err,
+    };
+    defer gpa.free(data);
+    if (data.len < expected) return error.TruncatedArray;
+    if (data.len > expected) return error.InvalidFileSize;
+
+    const entries = try gpa.alloc(Voice, speakers.len);
+    errdefer gpa.free(entries);
+    var filled: usize = 0;
+    errdefer {
+        for (entries[0..filled]) |entry| {
+            gpa.free(entry.name);
+            gpa.free(entry.embeddings);
+        }
+    }
+
+    for (speakers, 0..) |speaker, index| {
+        const start = index * bytes_per_voice;
+        const embeddings = try gpa.alloc(f32, values_per_voice);
+        errdefer gpa.free(embeddings);
+        for (embeddings, 0..) |*value, offset| {
+            const byte_offset = start + offset * @sizeOf(f32);
+            const bits = std.mem.readInt(u32, data[byte_offset..][0..@sizeOf(f32)], .little);
+            value.* = @bitCast(bits);
+        }
+
+        const name = try gpa.dupe(u8, speaker);
+        errdefer gpa.free(name);
+
+        entries[filled] = .{
+            .name = name,
+            .rows = rows,
+            .columns = columns,
+            .embeddings = embeddings,
+        };
+        filled += 1;
+    }
+
+    return .{ .gpa = gpa, .entries = entries[0..filled] };
+}
+
+/// Liest genau eine Stimme aus einer flachen Datei mit little-endian Float32-Werten.
+///
+/// Die Datei muss genau `rows` Zeilen mit je `columns` Werten enthalten.
+pub fn loadFlatBinSingle(
+    gpa: std.mem.Allocator,
+    io: std.Io,
+    path: []const u8,
+    name: []const u8,
+    rows: usize,
+    columns: usize,
+) !Voices {
+    const speakers = [_][]const u8{name};
+    return loadFlatBin(gpa, io, path, &speakers, rows, columns);
 }
 
 const CentralHeader = struct {
@@ -282,4 +370,122 @@ test "NPY-Header wird gelesen" {
     try std.testing.expect(!parsed.fortran_order);
     try std.testing.expectEqual(@as(usize, 2), parsed.shape[0]);
     try std.testing.expectEqual(@as(usize, 3), parsed.shape[1]);
+}
+
+/// Kodiert Werte als little-endian Float32-Bytes.
+fn encodeFlat(gpa: std.mem.Allocator, values: []const f32) ![]u8 {
+    const bytes = try gpa.alloc(u8, values.len * @sizeOf(f32));
+    errdefer gpa.free(bytes);
+    for (values, 0..) |value, index| {
+        const offset = index * @sizeOf(f32);
+        std.mem.writeInt(u32, bytes[offset..][0..@sizeOf(f32)], @bitCast(value), .little);
+    }
+    return bytes;
+}
+
+/// Legt eine Datei mit little-endian Float32-Werten in ein temporaeres Verzeichnis.
+fn writeFlatFile(dir: std.Io.Dir, io: std.Io, sub_path: []const u8, values: []const f32) !void {
+    const bytes = try encodeFlat(std.testing.allocator, values);
+    defer std.testing.allocator.free(bytes);
+    try dir.writeFile(io, .{ .sub_path = sub_path, .data = bytes });
+}
+
+/// Liefert den absoluten Pfad einer Datei im temporaeren Verzeichnis.
+fn flatFilePath(dir: std.Io.Dir, io: std.Io, sub_path: []const u8, buffer: []u8) ![]const u8 {
+    var dir_buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const dir_len = try dir.realPath(io, &dir_buffer);
+    return std.fmt.bufPrint(buffer, "{s}/{s}", .{ dir_buffer[0..dir_len], sub_path });
+}
+
+test "Flache Float32-Datei liefert Stimmembeddings" {
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+
+    const io = std.testing.io;
+    const rows = 2;
+    const columns = 3;
+    const values = [_]f32{
+        0.5,  -1.25,  2.0,
+        3.75, -0.125, 100.0,
+        -0.5, 0.25,   -2.0,
+        0.0,  7.5,    -7.5,
+    };
+    try writeFlatFile(tmp.dir, io, "voices.bin", &values);
+
+    var path_buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const path = try flatFilePath(tmp.dir, io, "voices.bin", &path_buffer);
+
+    const speakers = [_][]const u8{ "af", "bf_emma" };
+    var voices = try loadFlatBin(std.testing.allocator, io, path, &speakers, rows, columns);
+    defer voices.deinit();
+
+    try std.testing.expectEqual(@as(usize, 2), voices.entries.len);
+    try std.testing.expectEqualStrings("af", voices.entries[0].name);
+    try std.testing.expectEqualStrings("bf_emma", voices.entries[1].name);
+    try std.testing.expectEqual(@as(usize, rows), voices.entries[0].rows);
+    try std.testing.expectEqual(@as(usize, columns), voices.entries[0].columns);
+    try std.testing.expectEqualSlices(f32, values[0..6], voices.entries[0].embeddings);
+    try std.testing.expectEqualSlices(f32, values[6..12], voices.entries[1].embeddings);
+}
+
+test "Flache Float32-Datei meldet abweichende Dateigroesse" {
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+
+    const io = std.testing.io;
+    const rows = 1;
+    const columns = 2;
+    const speakers = [_][]const u8{"af"};
+    const values = [_]f32{ 1.0, 2.0 };
+
+    var path_buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const path = try flatFilePath(tmp.dir, io, "voices.bin", &path_buffer);
+
+    // Zu kleine Datei.
+    const bytes = try encodeFlat(std.testing.allocator, &values);
+    defer std.testing.allocator.free(bytes);
+    try tmp.dir.writeFile(io, .{ .sub_path = "voices.bin", .data = bytes[0 .. bytes.len - 1] });
+    try std.testing.expectError(
+        error.TruncatedArray,
+        loadFlatBin(std.testing.allocator, io, path, &speakers, rows, columns),
+    );
+
+    // Zu grosse Datei.
+    const too_large = try std.testing.allocator.alloc(u8, bytes.len + 1);
+    defer std.testing.allocator.free(too_large);
+    @memcpy(too_large[0..bytes.len], bytes);
+    too_large[bytes.len] = 0;
+    try tmp.dir.writeFile(io, .{ .sub_path = "voices.bin", .data = too_large });
+    try std.testing.expectError(
+        error.InvalidFileSize,
+        loadFlatBin(std.testing.allocator, io, path, &speakers, rows, columns),
+    );
+}
+
+test "Leere Stimmliste und leere Form werden abgelehnt" {
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+
+    const io = std.testing.io;
+    const values = [_]f32{ 1.0, 2.0 };
+    try writeFlatFile(tmp.dir, io, "voices.bin", &values);
+
+    var path_buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const path = try flatFilePath(tmp.dir, io, "voices.bin", &path_buffer);
+
+    const no_speakers = [_][]const u8{};
+    try std.testing.expectError(
+        error.NoSpeakers,
+        loadFlatBin(std.testing.allocator, io, path, &no_speakers, 1, 2),
+    );
+
+    const speakers = [_][]const u8{"af"};
+    try std.testing.expectError(
+        error.UnsupportedShape,
+        loadFlatBin(std.testing.allocator, io, path, &speakers, 0, 2),
+    );
+    try std.testing.expectError(
+        error.UnsupportedShape,
+        loadFlatBin(std.testing.allocator, io, path, &speakers, 1, 0),
+    );
 }

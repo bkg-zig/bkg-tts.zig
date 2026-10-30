@@ -1,219 +1,386 @@
 {
-  "tasks": [
-    {
-      "id": "KITTEN-001",
-      "title": "Build-Abhaengigkeit zu zig-body.bkg aufloesen",
-      "owner": "Mody (MiniMax-M3.1-Flash)",
-      "model": "minimaxai/minimax-m3.1-flash",
-      "tools": [
-        "shell",
-        "edit",
-        "write",
-        "read"
-      ],
-      "skills": [
-        "openchamber-change-discipline",
-        "bkg-zero"
-      ],
-      "started_at": "2026-10-29T16:40:00Z",
-      "scope": "build.zig, build.zig.zon, src/main.zig, src/router.zig, src/api.zig, src/web_request.zig, src/audio.zig",
-      "status": "in_progress",
-      "problem": "build.zig.zon referenziert ../../zig-body.bkg; das Verzeichnis existiert auf diesem Host nicht, damit ist kein Build und kein Test moeglich.",
-      "plan": "Projekt eigenstaendig machen: HTTP-Request-Helfer und WAV/PCM-Encoder in src/ verlagern, Dependency entfernen.",
-      "verification": [
-        "2026-10-29: build.zig.zon referenziert kein zig-body.bkg mehr; src/web_request.zig und src/audio.zig liegen lokal in src/.",
-        "2026-10-29: `zig build` mit Zig 0.16.0 (/home/openchamber/.local/share/zig-x86_64-linux-0.16.0/zig) scheitert weiter an 2 Fehlern: src/engine.zig:3 (@import(\"bkg-tts\") ohne Modul) und src/api.zig:528 (lokales const audio verdeckt den Import audio.zig).",
-        "2026-10-29: `zig build wasm` laeuft mit Zig 0.16.0 fehlerfrei durch."
-      ],
-      "changed_files": [
-        "build.zig",
-        "build.zig.zon",
-        "src/web_request.zig",
-        "src/audio.zig",
-        "src/main.zig",
-        "src/router.zig",
-        "src/api.zig"
-      ]
-    },
-    {
-      "id": "KITTEN-002",
-      "title": "Kitten-ONNX-Engine implementieren",
-      "owner": "Mody (MiniMax-M3.1-Flash)",
-      "model": "minimaxai/minimax-m3.1-flash",
-      "tools": [
-        "shell",
-        "edit",
-        "write",
-        "read"
-      ],
-      "skills": [
-        "openchamber-change-discipline",
-        "performance-engineering"
-      ],
-      "started_at": "2026-10-29T16:40:00Z",
-      "scope": "src/kitten/*.zig, src/engine.zig, src/config.zig",
-      "status": "in_progress",
-      "problem": "Kitten-TTS-ONNX-Modelle sind lokal vorhanden, aber im Zig-Server gibt es keine Engine dafuer.",
-      "plan": "ONNX-Runtime-C-API via dlopen, eSpeak-NG-Phonemizer, NPZ/NPY-Voice-Loader, TextCleaner, Chunking, Style-Auswahl, Speed-Priors, Tail-Trim, Modell-Registry mit Hot-Swap.",
-      "verification": [
-        "2026-10-29: src/kitten/ort_api.zig erzeugt aus ~/.local/share/onnxruntime/include/onnxruntime_c_api.h (ORT API v22, 318 Member) via scripts/gen_ort_api.py.",
-        "2026-10-29: src/kitten/voices.zig liest das echte voices.npz (8 Stimmen, je f4 400x256, unkomprimiert gespeichert) - Format passt zum eigenen ZIP/NPY-Leser.",
-        "2026-10-29: espeak-ng ist auf dem Host vorhanden (/usr/bin/espeak-ng); ONNX-Runtime 1.22 unter ~/.local/share/onnxruntime/lib.",
-        "2026-10-29: noch kein Lauf des Modells - src/kitten ist nicht in src/engine.zig verdrahtet."
-      ],
-      "changed_files": [
-        "src/kitten/ort_api.zig",
-        "src/kitten/ort.zig",
-        "src/kitten/voices.zig",
-        "src/kitten/phonemize.zig",
-        "scripts/gen_ort_api.py"
-      ]
-    },
-    {
-      "id": "KITTEN-003",
-      "title": "API und Web-UI auf Kitten erweitern",
-      "owner": "Mody (MiniMax-M3.1-Flash)",
-      "model": "minimaxai/minimax-m3.1-flash",
-      "tools": [
-        "shell",
-        "edit",
-        "write",
-        "read"
-      ],
-      "skills": [
-        "openchamber-change-discipline",
-        "locale-ui-patterns",
-        "theme-system"
-      ],
-      "started_at": "2026-10-29T16:40:00Z",
-      "scope": "src/api.zig, src/router.zig, src/realtime.zig, src/openapi.json, web/src/**",
-      "status": "pending",
-      "problem": "API und UI kennen nur Magpie-Stimmen und 22050 Hz; die Python-Referenz bietet Dual-API und Modell-Registry-Endpunkte.",
-      "plan": "Kitten-Stimmen und 24000 Hz, Dual-API /tts und /v1/audio/speech, Registry-Endpunkte, UI-Anpassung und dist-Rebuild.",
-      "verification": [],
-      "changed_files": []
-    },
-    {
-      "id": "KITTEN-004",
-      "title": "End-to-End verifizieren und Doku aktualisieren",
-      "owner": "Mody (MiniMax-M3.1-Flash)",
-      "model": "minimaxai/minimax-M3.1-flash",
-      "tools": [
-        "shell",
-        "edit",
-        "write",
-        "read"
-      ],
-      "skills": [
-        "bkg-production-readiness",
-        "communication-style"
-      ],
-      "started_at": "2026-10-29T16:40:00Z",
-      "scope": "docs/**, README.md, TASKS.md, scripts/**",
-      "status": "pending",
-      "problem": "Dokumentation beschreibt den Magpie-Stand und den nicht verfuegbaren Framework-Pfad.",
-      "plan": "Server starten, WAV-Ausgabe messen, Doku auf den realen Stand bringen.",
-      "verification": [],
-      "changed_files": []
-    },
-    {
-      "id": "POCKET-RESEARCH-001",
-      "title": "Laufzeitvertrag des Pocket-TTS-ONNX-Formats recherchieren",
-      "owner": "Mody (MiniMax-M3.1-Flash)",
-      "model": "minimaxai/minimax-m3.1-flash",
-      "tools": [
-        "shell",
-        "read",
-        "grep"
-      ],
-      "skills": [],
-      "started_at": "2026-10-29T21:50:00Z",
-      "scope": "Recherche, keine Aenderung am Quellcode. Quellen: /home/openchamber/dump/upstream-clones/pocket-tts, ~/.local/share/onnxruntime/include/onnxruntime_c_api.h",
-      "status": "completed",
-      "problem": "Fuer eine eigene Zig-Implementierung mit ONNX-Runtime C-API fehlten Inputs und Outputs, Metadatenschluessel, Tokenizer-, Voice-, Sampling- und Chunking-Vertrag sowie die Dateistruktur des HF-Repos.",
-      "plan": "Lokale Quellen lesen, sieben Fragen mit konkreten Schluesselnamen und Zitaten beantworten, nicht belegbare Zahlenwerte als unklar markieren.",
-      "verification": [
-        "2026-10-29: Sieben Fragen beantwortet, belegt aus src/pocket_tts_onnx/tts.py, src/pocket_tts_onnx/export/step_model.py, src/pocket_tts_onnx/export/export.py, src/pocket_tts_onnx/export/web.py, src/pocket_tts_onnx/text.py, packages/pocket-tts-onnx/src/*.ts, docs/DESIGN.md, exports/export-all.sh und exports/export-all.log.",
-        "2026-10-29: ORT-C-API-Fakten gegen das lokale Header ~/.local/share/onnxruntime/include/onnxruntime_c_api.h geprueft (ORT 1.22.0, ORT_API_VERSION 22): SessionGetModelMetadata :2125, ModelMetadataLookupCustomMetadataMap :2185, ModelMetadataGetCustomMetadataMapKeys :2262.",
-        "2026-10-29: Suche nach lokalen pocket_tts_config-Assets ausserhalb des Upstream-Clones und nach pocket-Treffern im Workspace bkg-tts.zig ergab keine weiteren Quellen."
-      ],
-      "changed_files": [
-        ".brain/tasks.json",
-        ".brain/research.json",
-        ".brain/memory.json"
-      ]
-    },
-    {
-      "id": "PHONON-KOKORO-RESEARCH-001",
-      "title": "Formatvertrag von Phonon (xn-ptts) und Kokoro fuer den Zig-Port recherchieren",
-      "owner": "Mody (MiniMax-M3.1-Flash)",
-      "model": "minimaxai/minimax-m3.1-flash",
-      "tools": [
-        "shell",
-        "read",
-        "grep",
-        "webfetch"
-      ],
-      "skills": [],
-      "started_at": "2026-10-29",
-      "scope": "Recherche ohne Codeaenderung. Quellen: /home/openchamber/develop/xn-ptts, /home/openchamber/develop/kokoro-fastapi-german, ~/.config/openchamber/speech-models/kokoro-en-v0_19, HF-Repo gradium/phonon-31m-en, sherpa-onnx-Quelltext.",
-      "status": "completed",
-      "problem": "Fuer eine eigene Zig-Implementierung fehlten Checkpoint-Format, Tensor-Namen und dtypes, Config-Werte, Architektur, Tokenizer, Audio-Pfad, Generierungsregeln, Voice- und CLI-Vertrag sowie die I/O-Vertrage der Kokoro-ONNX- und der Kokoro-PyTorch-Variante.",
-      "plan": "Quellcode in xn-ptts und kokoro-fastapi-german lesen, Checkpoint-Header von Hugging Face per HTTP-Range lesen, ONNX-I/O mit ORT 1.22 messen, Metadaten und Initialisatoren mit eigenem Protobuf-Parser lesen, deutsche State-Dict-Tensorformen mit torch pruefen, elf Fragen mit Zahlen und Pfaden beantworten.",
-      "verification": [
-        "2026-10-29: xn-ptts gelesen: ptts/src/tts_model.rs (690 Zeilen, TTSConfig ab Zeile 50), ptts/src/plan.rs (PROMPT_SEQ_HEADROOM 512, MAX_FIT_TOKENS 200, frame_budget ceil((n/3 + 2) * frame_rate), seq_budget), ptts/src/loader.rs (remap_key ab Zeile 15, is_unused_by_tts_model ab Zeile 47), ptts/src/mimi.rs (hop_length 120, frame_size 1920), ptts/src/wav.rs (write_header, f32 zu i16 mit 32767), ptts/src/bin/ptts/main.rs (CLI-Flags).",
-        "2026-10-29: Safetensors-Header von gradium/phonon-31m-en per HTTP-Range gelesen: 185 Tensoren, 41096035 Parameter (F32 10305313, BF16 30790722), model.safetensors 102823920 B. Tensorliste in ~/.cache/probe/phonon_tensors.txt.",
-        "2026-10-29: Release-Config gradium/phonon-31m-en gelesen: d_model 512, 6 Layer, 8 Heads, FFN 2048, GELU erf, RoPE theta 10000, frame_rate 12.5, sample_rate 24000, eos_threshold 4.0, lsd_decode_steps 1, vocab_size 4001.",
-        "2026-10-29: Kokoro-ONNX ~/.config/openchamber/speech-models/kokoro-en-v0_19/model.onnx mit ORT 1.22 geprueft: inputs=3 (tokens int64 [1,-1], style float32 [1,256], speed float32 [1]), outputs=1 (audio float32 [-1]).",
-        "2026-10-29: voices.bin 5755904 B = 1438976 f32 = 11 Sprecher mal 511 Style-Zeilen mal 256. tokens.txt 177 Zeilen mit 177 eindeutigen Symbolen, IDs 0 bis 173 und 175 bis 177, ID 174 unbelegt.",
-        "2026-10-29: Deutsches Kokoro-PyTorch-Modell api/src/models/v1_0/kokoro-german-v1_1-de.pth (327231582 B) mit torch gelesen: 548 Tensoren in 5 Gruppen (bert, bert_encoder, predictor, text_encoder, decoder), word_embeddings [178,128], position_embeddings [512,128], text_encoder.embedding [178,512]. Voices df_eva.pt und dm_bernd.pt je [512,1,256] float32.",
-        "2026-10-29: api/src/models/v1_0/config.json enthaelt 9 B mit 'Not Found', der HTTP-Abruf der Remote-Config antwortete mit 'Invalid username or password.'. Die Config-Werte des deutschen Modells (vocab, n_token, style_dim) bleiben unklar.",
-        "2026-10-29: Keine Projektdatei fuer die Laufzeit geaendert, kein Commit. Probe-Artefakte liegen unter ~/.cache/probe/."
-      ],
-      "changed_files": [
-        ".brain/research.json",
-        ".brain/memory.json",
-        ".brain/tasks.json"
-      ]
-    }
-  ],
-  "last": {
-    "id": "POCKET-RESEARCH-001",
-    "title": "Laufzeitvertrag des Pocket-TTS-ONNX-Formats an echten Modelldateien verifizieren",
-    "owner": "Mody (MiniMax-M3.1-Flash)",
-    "model": "minimaxai/minimax-m3.1-flash",
-    "tools": [
-      "shell",
-      "read",
-      "write",
-      "execute"
-    ],
-    "skills": [
-      "bkg-zero"
-    ],
-    "started_at": "2026-10-29T20:00:00Z",
-    "scope": "Recherche ohne Codeaenderung an der Laufzeit, Aktualisierung von .brain und Memory",
-    "status": "completed",
-    "problem": "Zahlenwerte in pocket_tts_config und der exakte Dateibestand des HF-Repos waren ohne Modelldatei unklar. Fruehere Notiz nannte zudem falsche Input-Namen und eine nicht existierende deutsche Single-File-Datei.",
-    "plan": "Modelle aus dem HF-Repo laden, mit eigenem Protobuf-Parser auslesen, HF-Tree und GitHub-Release gegenpruefen, Recherche-Eintrag, Task und Memory aktualisieren, Download-Artefakte loeschen.",
-    "verification": [
-      "2026-10-29: inspect_onnx.py auf pocket-tts-english.onnx, pocket-tts-english-ipa.onnx und de/model.onnx ausgefuehrt, Ein- und Ausgaenge sowie Metadaten protokolliert.",
-      "2026-10-29: de/assets.json und de/manifest.json, en/manifest.json aus dem HF-Repo gelesen, HF-Tree-API und GitHub-Release-API abgefragt.",
-      "2026-10-29: Downloaddateien unter /home/openchamber/dump/pocket-research/ und /tmp/opencode/ nach der Recherche geloescht, keine Projektdatei fuer die Laufzeit geaendert.",
-      "2026-10-29: Deutscher Encoder de/encoder.onnx (39183564 B, sha256 80e0efae03c43e2ca1252874095fa1df4a2f36c5140246c9349810de70abdd50) mit ORT 1.22 geprueft: inputs=1 (audio float32 [1,1,-1]), outputs=1 (cond float32 [1,-1,1024]); Protobuf: ir_version 8, Producer pytorch, Opset ai.onnx 17, 553 Nodes, 45 Initializers, keine Quant-Ops.",
-      "2026-10-29: de/manifest.json lokal gelesen, Felder und Digest-Praefixe gegen export/web.py::split_for_web und _entry sowie pipeline.ts::Manifest geprueft; model-Digest 6ea90a844c839eb9..., encoder-Digest 80e0efae03c43e2c..., assets 771450 B a0c0bedad0a7780f... stimmen mit den lokal berechneten Werten ueberein.",
-      "2026-10-29: de/model.onnx erneut per ORT-C-API geprueft: inputs=12, outputs=7, alle Shapes dynamisch wie im englischen Modell.",
-      "2026-10-29: docs/POCKET-TTS-ONNX.md angelegt und README.md um den Verweis ergaenzt. Zeilenangaben des Dokuments stichprobenweise gegen den Upstream-Quelltext geprueft, drei falsche Verweise korrigiert. Kein Laufzeitcode geaendert.",
-      "2026-10-29: Vier ungenaue Formulierungen im Dokument praezisiert: Suchumfang der top-p-Suche, Ersetzungsregel fuer doppelte Leerzeichen, Bedingung fuer die acht Vorab-Leerzeichen, Spannweite der Voice-Shapes.",
-      "2026-10-30: tasks.json war durch einen parallelen Append der anderen Sitzung kein gueltiges JSON, das Task-Objekt PHONON-KOKORO-RESEARCH-001 lag auf Root-Ebene statt im tasks-Array. Das fremde Objekt unveraendert in das Array verschoben, JSON wieder valide. Der Pocket-TTS-Record liegt zusaetzlich additiv in .brain/pocket-tts.json."
-    ],
-    "changed_files": [
-      ".brain/research.json",
-      ".brain/memory.json",
-      ".brain/tasks.json",
-      ".brain/pocket-tts.json",
-      "docs/POCKET-TTS-ONNX.md",
-      "README.md"
-    ]
+ "tasks": [
+  {
+   "id": "KITTEN-001",
+   "title": "Build-Abhaengigkeit zu zig-body.bkg aufloesen",
+   "owner": "Mody (MiniMax-M3.1-Flash)",
+   "model": "minimaxai/minimax-m3.1-flash",
+   "tools": [
+    "shell",
+    "edit",
+    "write",
+    "read"
+   ],
+   "skills": [
+    "openchamber-change-discipline",
+    "bkg-zero"
+   ],
+   "started_at": "2026-10-29T16:40:00Z",
+   "scope": "build.zig, build.zig.zon, src/main.zig, src/router.zig, src/api.zig, src/web_request.zig, src/audio.zig",
+   "status": "superseded",
+   "problem": "build.zig.zon referenziert ../../zig-body.bkg; das Verzeichnis existiert auf diesem Host nicht, damit ist kein Build und kein Test moeglich.",
+   "plan": "Projekt eigenstaendig machen: HTTP-Request-Helfer und WAV/PCM-Encoder in src/ verlagern, Dependency entfernen.",
+   "verification": [
+    "2026-10-29: build.zig.zon referenziert kein zig-body.bkg mehr; src/web_request.zig und src/audio.zig liegen lokal in src/.",
+    "2026-10-29: `zig build` mit Zig 0.16.0 (/home/openchamber/.local/share/zig-x86_64-linux-0.16.0/zig) scheitert weiter an 2 Fehlern: src/engine.zig:3 (@import(\"bkg-tts\") ohne Modul) und src/api.zig:528 (lokales const audio verdeckt den Import audio.zig).",
+    "2026-10-29: `zig build wasm` laeuft mit Zig 0.16.0 fehlerfrei durch.",
+    "2026-10-30T03:20:00Z: Aufgabe durch ENGINE-001 (Deskriptor-basierte Registry) abgeloest. Die Einzelbefehle bleiben in der Werkzeugkette, die Modellwahl laeuft aber ueber Deskriptoren."
+   ],
+   "changed_files": [
+    "build.zig",
+    "build.zig.zon",
+    "src/web_request.zig",
+    "src/audio.zig",
+    "src/main.zig",
+    "src/router.zig",
+    "src/api.zig"
+   ]
+  },
+  {
+   "id": "KITTEN-002",
+   "title": "Kitten-ONNX-Engine implementieren",
+   "owner": "Mody (MiniMax-M3.1-Flash)",
+   "model": "minimaxai/minimax-m3.1-flash",
+   "tools": [
+    "shell",
+    "edit",
+    "write",
+    "read"
+   ],
+   "skills": [
+    "openchamber-change-discipline",
+    "performance-engineering"
+   ],
+   "started_at": "2026-10-29T16:40:00Z",
+   "scope": "src/kitten/*.zig, src/engine.zig, src/config.zig",
+   "status": "superseded",
+   "problem": "Kitten-TTS-ONNX-Modelle sind lokal vorhanden, aber im Zig-Server gibt es keine Engine dafuer.",
+   "plan": "ONNX-Runtime-C-API via dlopen, eSpeak-NG-Phonemizer, NPZ/NPY-Voice-Loader, TextCleaner, Chunking, Style-Auswahl, Speed-Priors, Tail-Trim, Modell-Registry mit Hot-Swap.",
+   "verification": [
+    "2026-10-29: src/kitten/ort_api.zig erzeugt aus ~/.local/share/onnxruntime/include/onnxruntime_c_api.h (ORT API v22, 318 Member) via scripts/gen_ort_api.py.",
+    "2026-10-29: src/kitten/voices.zig liest das echte voices.npz (8 Stimmen, je f4 400x256, unkomprimiert gespeichert) - Format passt zum eigenen ZIP/NPY-Leser.",
+    "2026-10-29: espeak-ng ist auf dem Host vorhanden (/usr/bin/espeak-ng); ONNX-Runtime 1.22 unter ~/.local/share/onnxruntime/lib.",
+    "2026-10-29: noch kein Lauf des Modells - src/kitten ist nicht in src/engine.zig verdrahtet.",
+    "2026-10-30T03:20:00Z: Aufgabe durch ENGINE-001 (Deskriptor-basierte Registry) abgeloest. Die Einzelbefehle bleiben in der Werkzeugkette, die Modellwahl laeuft aber ueber Deskriptoren."
+   ],
+   "changed_files": [
+    "src/kitten/ort_api.zig",
+    "src/kitten/ort.zig",
+    "src/kitten/voices.zig",
+    "src/kitten/phonemize.zig",
+    "scripts/gen_ort_api.py"
+   ]
+  },
+  {
+   "id": "KITTEN-003",
+   "title": "API und Web-UI auf Kitten erweitern",
+   "owner": "Mody (MiniMax-M3.1-Flash)",
+   "model": "minimaxai/minimax-m3.1-flash",
+   "tools": [
+    "shell",
+    "edit",
+    "write",
+    "read"
+   ],
+   "skills": [
+    "openchamber-change-discipline",
+    "locale-ui-patterns",
+    "theme-system"
+   ],
+   "started_at": "2026-10-29T16:40:00Z",
+   "scope": "src/api.zig, src/router.zig, src/realtime.zig, src/openapi.json, web/src/**",
+   "status": "superseded",
+   "problem": "API und UI kennen nur Magpie-Stimmen und 22050 Hz; die Python-Referenz bietet Dual-API und Modell-Registry-Endpunkte.",
+   "plan": "Kitten-Stimmen und 24000 Hz, Dual-API /tts und /v1/audio/speech, Registry-Endpunkte, UI-Anpassung und dist-Rebuild.",
+   "verification": [
+    "2026-10-30T03:20:00Z: Aufgabe durch ENGINE-001 (Deskriptor-basierte Registry) abgeloest. Die Einzelbefehle bleiben in der Werkzeugkette, die Modellwahl laeuft aber ueber Deskriptoren."
+   ],
+   "changed_files": []
+  },
+  {
+   "id": "KITTEN-004",
+   "title": "End-to-End verifizieren und Doku aktualisieren",
+   "owner": "Mody (MiniMax-M3.1-Flash)",
+   "model": "minimaxai/minimax-M3.1-flash",
+   "tools": [
+    "shell",
+    "edit",
+    "write",
+    "read"
+   ],
+   "skills": [
+    "bkg-production-readiness",
+    "communication-style"
+   ],
+   "started_at": "2026-10-29T16:40:00Z",
+   "scope": "docs/**, README.md, TASKS.md, scripts/**",
+   "status": "superseded",
+   "problem": "Dokumentation beschreibt den Magpie-Stand und den nicht verfuegbaren Framework-Pfad.",
+   "plan": "Server starten, WAV-Ausgabe messen, Doku auf den realen Stand bringen.",
+   "verification": [
+    "2026-10-30T03:20:00Z: Aufgabe durch ENGINE-001 (Deskriptor-basierte Registry) abgeloest. Die Einzelbefehle bleiben in der Werkzeugkette, die Modellwahl laeuft aber ueber Deskriptoren."
+   ],
+   "changed_files": []
+  },
+  {
+   "id": "POCKET-RESEARCH-001",
+   "title": "Laufzeitvertrag des Pocket-TTS-ONNX-Formats recherchieren",
+   "owner": "Mody (MiniMax-M3.1-Flash)",
+   "model": "minimaxai/minimax-m3.1-flash",
+   "tools": [
+    "shell",
+    "read",
+    "grep"
+   ],
+   "skills": [],
+   "started_at": "2026-10-29T21:50:00Z",
+   "scope": "Recherche, keine Aenderung am Quellcode. Quellen: /home/openchamber/dump/upstream-clones/pocket-tts, ~/.local/share/onnxruntime/include/onnxruntime_c_api.h",
+   "status": "completed",
+   "problem": "Fuer eine eigene Zig-Implementierung mit ONNX-Runtime C-API fehlten Inputs und Outputs, Metadatenschluessel, Tokenizer-, Voice-, Sampling- und Chunking-Vertrag sowie die Dateistruktur des HF-Repos.",
+   "plan": "Lokale Quellen lesen, sieben Fragen mit konkreten Schluesselnamen und Zitaten beantworten, nicht belegbare Zahlenwerte als unklar markieren.",
+   "verification": [
+    "2026-10-29: Sieben Fragen beantwortet, belegt aus src/pocket_tts_onnx/tts.py, src/pocket_tts_onnx/export/step_model.py, src/pocket_tts_onnx/export/export.py, src/pocket_tts_onnx/export/web.py, src/pocket_tts_onnx/text.py, packages/pocket-tts-onnx/src/*.ts, docs/DESIGN.md, exports/export-all.sh und exports/export-all.log.",
+    "2026-10-29: ORT-C-API-Fakten gegen das lokale Header ~/.local/share/onnxruntime/include/onnxruntime_c_api.h geprueft (ORT 1.22.0, ORT_API_VERSION 22): SessionGetModelMetadata :2125, ModelMetadataLookupCustomMetadataMap :2185, ModelMetadataGetCustomMetadataMapKeys :2262.",
+    "2026-10-29: Suche nach lokalen pocket_tts_config-Assets ausserhalb des Upstream-Clones und nach pocket-Treffern im Workspace bkg-tts.zig ergab keine weiteren Quellen."
+   ],
+   "changed_files": [
+    ".brain/tasks.json",
+    ".brain/research.json",
+    ".brain/memory.json"
+   ]
+  },
+  {
+   "id": "PHONON-KOKORO-RESEARCH-001",
+   "title": "Formatvertrag von Phonon (xn-ptts) und Kokoro fuer den Zig-Port recherchieren",
+   "owner": "Mody (MiniMax-M3.1-Flash)",
+   "model": "minimaxai/minimax-m3.1-flash",
+   "tools": [
+    "shell",
+    "read",
+    "grep",
+    "webfetch"
+   ],
+   "skills": [],
+   "started_at": "2026-10-29",
+   "scope": "Recherche ohne Codeaenderung. Quellen: /home/openchamber/develop/xn-ptts, /home/openchamber/develop/kokoro-fastapi-german, ~/.config/openchamber/speech-models/kokoro-en-v0_19, HF-Repo gradium/phonon-31m-en, sherpa-onnx-Quelltext.",
+   "status": "completed",
+   "problem": "Fuer eine eigene Zig-Implementierung fehlten Checkpoint-Format, Tensor-Namen und dtypes, Config-Werte, Architektur, Tokenizer, Audio-Pfad, Generierungsregeln, Voice- und CLI-Vertrag sowie die I/O-Vertrage der Kokoro-ONNX- und der Kokoro-PyTorch-Variante.",
+   "plan": "Quellcode in xn-ptts und kokoro-fastapi-german lesen, Checkpoint-Header von Hugging Face per HTTP-Range lesen, ONNX-I/O mit ORT 1.22 messen, Metadaten und Initialisatoren mit eigenem Protobuf-Parser lesen, deutsche State-Dict-Tensorformen mit torch pruefen, elf Fragen mit Zahlen und Pfaden beantworten.",
+   "verification": [
+    "2026-10-29: xn-ptts gelesen: ptts/src/tts_model.rs (690 Zeilen, TTSConfig ab Zeile 50), ptts/src/plan.rs (PROMPT_SEQ_HEADROOM 512, MAX_FIT_TOKENS 200, frame_budget ceil((n/3 + 2) * frame_rate), seq_budget), ptts/src/loader.rs (remap_key ab Zeile 15, is_unused_by_tts_model ab Zeile 47), ptts/src/mimi.rs (hop_length 120, frame_size 1920), ptts/src/wav.rs (write_header, f32 zu i16 mit 32767), ptts/src/bin/ptts/main.rs (CLI-Flags).",
+    "2026-10-29: Safetensors-Header von gradium/phonon-31m-en per HTTP-Range gelesen: 185 Tensoren, 41096035 Parameter (F32 10305313, BF16 30790722), model.safetensors 102823920 B. Tensorliste in ~/.cache/probe/phonon_tensors.txt.",
+    "2026-10-29: Release-Config gradium/phonon-31m-en gelesen: d_model 512, 6 Layer, 8 Heads, FFN 2048, GELU erf, RoPE theta 10000, frame_rate 12.5, sample_rate 24000, eos_threshold 4.0, lsd_decode_steps 1, vocab_size 4001.",
+    "2026-10-29: Kokoro-ONNX ~/.config/openchamber/speech-models/kokoro-en-v0_19/model.onnx mit ORT 1.22 geprueft: inputs=3 (tokens int64 [1,-1], style float32 [1,256], speed float32 [1]), outputs=1 (audio float32 [-1]).",
+    "2026-10-29: voices.bin 5755904 B = 1438976 f32 = 11 Sprecher mal 511 Style-Zeilen mal 256. tokens.txt 177 Zeilen mit 177 eindeutigen Symbolen, IDs 0 bis 173 und 175 bis 177, ID 174 unbelegt.",
+    "2026-10-29: Deutsches Kokoro-PyTorch-Modell api/src/models/v1_0/kokoro-german-v1_1-de.pth (327231582 B) mit torch gelesen: 548 Tensoren in 5 Gruppen (bert, bert_encoder, predictor, text_encoder, decoder), word_embeddings [178,128], position_embeddings [512,128], text_encoder.embedding [178,512]. Voices df_eva.pt und dm_bernd.pt je [512,1,256] float32.",
+    "2026-10-29: api/src/models/v1_0/config.json enthaelt 9 B mit 'Not Found', der HTTP-Abruf der Remote-Config antwortete mit 'Invalid username or password.'. Die Config-Werte des deutschen Modells (vocab, n_token, style_dim) bleiben unklar.",
+    "2026-10-29: Keine Projektdatei fuer die Laufzeit geaendert, kein Commit. Probe-Artefakte liegen unter ~/.cache/probe/."
+   ],
+   "changed_files": [
+    ".brain/research.json",
+    ".brain/memory.json",
+    ".brain/tasks.json"
+   ]
+  },
+  {
+   "id": "KOKORO-ONNX-CONTRACT-002",
+   "title": "Vertrag zwischen Kokoro-ONNX, voices.bin und tokens.txt an echten Dateien verifizieren",
+   "owner": "Mody (MiniMax-M3.1-Flash)",
+   "model": "minimaxai/minimax-m3.1-flash",
+   "tools": [
+    "shell",
+    "read",
+    "grep",
+    "edit",
+    "write"
+   ],
+   "skills": [
+    "bkg-zero"
+   ],
+   "started_at": "2026-10-30T00:40:00Z",
+   "scope": "Recherche ohne Aenderung an Laufzeit oder Zielprojekt. Quellen: ~/.config/openchamber/speech-models/kokoro-en-v0_19, /home/openchamber/develop/kokoro-fastapi-german, kokoro.js 81b2747, kitten_tts_rs, ~/.cache/opencode-probe/src/kokoro_ort.c",
+   "status": "completed",
+   "problem": "Fuer den Zig-Port waren Layout von voices.bin, Style-Indexberechnung, ONNX-Ein- und Ausgaenge, Token-IDs, Sample-Rate und Stimmenreihenfolge offen. Zusaetzlich stuerzte ein ORT-1.22-Run in der eigenen Probe.",
+   "plan": "ONNX-Metadaten und Graph mit eigenem Protobuf-Parser lesen, voices.bin und tokens.txt binaer messen, den Style-Zugriff gegen kokoro.js und die kokoro-Python-Pipeline pruefen, den ORT-Run mit der C-API-Probe reproduzieren und den Absturz isolieren.",
+   "verification": [
+    "2026-10-30: ONNX-Metadaten mit eigenem Protobuf-Parser gelesen: sample_rate 24000, style_dim 511,1,256, n_speakers 11, model_type kokoro, language English, comment kokoro v0.19, speaker_names af,af_bella,af_nicole,af_sarah,af_sky,am_adam,am_michael,bf_emma,bf_isabella,bm_george,bm_lewis.",
+    "2026-10-30: ORT 1.22 Release-Probe gegen model.onnx: input[0] tokens type=7 dims=[1,-1], input[1] style type=1 dims=[1,256], input[2] speed type=1 dims=[1], output[0] audio type=1 dims=[-1].",
+    "2026-10-30: voices.bin 5755904 B = 1438976 f32 = 11 Bloecke mal 511 Zeilen mal 256 f32. Blockgrenzen bei Vielfachen von 511 bestaetigt, 523264 B je Stimme, 1024 B je Zeile.",
+    "2026-10-30: Style-Offset in der Probe bestaetigt: voice=1, row=10 ergibt abs_offset_f32=133376 gleich (1 mal 511 plus 10) mal 256, l2 5.108981.",
+    "2026-10-30: Laufzeitmessung: 19 Tokens ergaben 51000 Samples gleich 2.125 s bei 24 kHz, 119 Tokens mit 100 PAD ergaben 212400 Samples gleich 8.85 s. Das Modell maskiert PAD-Tokens nicht.",
+    "2026-10-30: tokens.txt 177 Zeilen mit 177 eindeutigen Symbolen, IDs 0 bis 173 und 175 bis 177, ID 174 unbelegt, die letzten drei Dateizeilen stehen nicht in ID-Reihenfolge.",
+    "2026-10-30: Stimmenreihenfolge per Kosinus gegen die 54 kokoro.js-v1.0-Packs geprueft: af_bella 0.8505, af_nicole 0.8888, am_adam 0.8425, am_michael 0.8392, bm_lewis 0.8626, af_sarah 0.7160, af_sky 0.7367, bf_emma 0.7125, bf_isabella 0.6057, bm_george 0.6479. Block 0 mit dem Namen af passt zu keiner v1.0-Stimme eindeutig, bester Wert af_sarah 0.8043.",
+    "2026-10-30: ORT-Absturz reproduziert und isoliert: mit KOKORO_OUT_UNINIT=1 endet der Run mit Signal 11 und si_addr 0x5, mit auf NULL initialisiertem Output-Array laeuft derselbe Run fehlerfrei. Ursache ist das uninitialisierte Output-Array der Probe, nicht ONNX Runtime.",
+    "2026-10-30: Der Referenzcode in kokoro-fastapi-german enthaelt kein ONNX: grep nach sess.run, voices.bin, onnxruntime, InferenceSession und import onnx liefert keinen Treffer. kokoro_v1.py:8 importiert KModel und KPipeline, kokoro_v1.py:51 laedt KModel(config, model).eval()."
+   ],
+   "changed_files": [
+    ".brain/tasks.json",
+    ".brain/research.json",
+    ".brain/memory.json"
+   ]
+  },
+  {
+   "id": "PIPER-PHONEMIZE-RESEARCH-001",
+   "title": "Piper-Phonemisierung (piper1-gpl, espeak-ng, phoneme_id_map, ONNX-Eingaben) fuer den Zig-Port recherchieren",
+   "owner": "Mody (MiniMax-M3.1-Flash)",
+   "model": "minimaxai/minimax-m3.1-flash",
+   "tools": [
+    "execute",
+    "shell",
+    "openchamber"
+   ],
+   "skills": [],
+   "started_at": "2026-10-30T01:39:16Z",
+   "scope": "Recherche ohne Aenderung an Projektcode. Quellen: OHF-Voice/piper1-gpl main 74ac24e7e8e2e57a5e1fada5505c74e3d9c1843a (src/piper, libpiper), rhasspy/piper-phonemize master, rhasspy/piper master, espeak-ng/espeak-ng master und Commit 724808c.",
+   "status": "completed",
+   "problem": "Fuer die Zig-Neuschreibung der Piper-Phonemisierung war unklar, welche espeak-ng-C-API-Aufrufe laufen, wie der IPA-String zerlegt wird, was mit Phonemen ohne Map-Eintrag passiert, wie die ID-Folge und die ONNX-Eingaben aufgebaut sind, wie phoneme_id_map gelesen wird und wo Satzgrenzen und Pausen entstehen.",
+   "plan": "Quellbaum von piper1-gpl, piper-phonemize, rhasspy/piper und espeak-ng ueber die GitHub-API und raw.githubusercontent.com lesen, die Aufrufstellen, Flag-Werte, CLAUSE-Konstanten, ID-Aufbau, Tensorformen und Config-Felder belegen und Python- und C++-Pfad gegeneinander abgleichen.",
+   "verification": [
+    "2026-10-30: piper1-gpl main src/piper/espeakbridge.c gelesen: espeak_Initialize(AUDIO_OUTPUT_SYNCHRONOUS, 0, data_dir, 0) mit Fehler bei Rueckgabe < 0, espeak_SetVoiceByName(voice) mit Fehler wenn ungleich EE_OK, Schleife while (text != NULL) mit espeak_TextToPhonemesWithTerminator((const void **)&text, espeakCHARS_AUTO, espeakPHONEMES_IPA, &terminator), terminator &= 0x000FFFFF, Zuordnung CLAUSE_PERIOD '.', CLAUSE_QUESTION '?', CLAUSE_EXCLAMATION '!', CLAUSE_COMMA ',', CLAUSE_COLON ':', CLAUSE_SEMICOLON ';'. Rueckgabe ist ein Zeiger in den espeak-internen Puffer, der Textzeiger wandert mit.",
+    "2026-10-30: piper1-gpl main src/piper/phonemize_espeak.py gelesen: Sprachflags per Regex \\([^)]+\\) entfernt, Terminator angehaengt, bei ',', ':' und ';' zusaetzlich Leerzeichen, Zerlegung list(unicodedata.normalize(\"NFD\", phonemes_str)) also codepointweise, Satzgrenze ueber end_of_sentence, Diphthong-Merge ueber _merge_known_vowel_clusters bei gesetzter vowel_clusters-Liste.",
+    "2026-10-30: piper1-gpl main src/piper/phoneme_ids.py gelesen: IDs gleich BOS '^' [1], PAD '_' [0], EOS '$' [2], je Phonem ids.extend(id_map[phoneme]) gefolgt von ids.extend(id_map[PAD]), unbekanntes Phoneme erzeugt _LOGGER.warning(\"Missing phoneme from id map: %s\", phoneme) und wird uebersprungen. DEFAULT_PHONEME_ID_MAP enthaelt 165 Einzel-IDs, Diphthonge aɪ 161, aʊ 162, ɔɪ 163, eɪ 164, oʊ 165.",
+    "2026-10-30: piper1-gpl main src/piper/voice.py Z. 533-561 gelesen: input int64 [1, N], input_lengths int64 [1] mit N, scales float32 [3] in der Reihenfolge noise_scale, length_scale, noise_w_scale, sid int64 [1] nur bei num_speakers groesser 1. length_scale wird nicht invertiert, der Wert geht unveraendert in scales[1].",
+    "2026-10-30: Piper-Config src/piper/config.py gelesen: Defaults noise_scale 0.667, length_scale 1.0, noise_w_scale 0.8, hop_length 256, phoneme_id_map aus config[\"phoneme_id_map\"], inference.noise_w als JSON-Schluessel fuer noise_w_scale, vowel_clusters als Liste von Tupeln.",
+    "2026-10-30: piper1-gpl main libpiper/src/piper.cpp und libpiper/include/piper_impl.hpp gelesen: espeak_Initialize(AUDIO_OUTPUT_SYNCHRONOUS, 0, final_espeak_data_path, 0), Terminator-Zeichen ', ', ': ', '; ' mit eingebautem Leerzeichen, Map-Indexierung ueber get_codepoint also nur der erste Codepoint des JSON-Schluessels, je Map-ID folgt ID, PAD und Separator, unbekannte Phoneme werden ohne Meldung verworfen, ID_PAD 0, ID_BOS 1, ID_EOS 2, PHONEME_SEPARATOR 0, Tensorformen wie im Python-Pfad.",
+    "2026-10-30: piper-phonemize master src/phonemize.cpp gelesen: phonemize_eSpeak ruft espeak_TextToPhonemesWithTerminator mit espeakCHARS_AUTO und Phonememodus 0x02, normalisiert NFD ueber una::norm::to_nfd_utf8, filtert Sprachflags, haengt je Terminator Typ Punkt, Frage, Ausrufezeichen, Komma, Doppelpunkt, Semikolon an und setzt bei CLAUSE_TYPE_SENTENCE einen neuen Satz. src/phoneme_ids.cpp belegt addBos, addEos und interspersePad als Schalter.",
+    "2026-10-30: espeak-ng master src/libespeak-ng/speech.c gelesen: espeak_TextToPhonemes ruft espeak_TextToPhonemesWithTerminator mit terminator gleich NULL auf, die Funktion dekodiert den Text, ruft TranslateClauseWithTerminator und setzt *textptr auf text_decoder_get_buffer, das bei EOF NULL liefert (src/libespeak-ng/encoding.c Z. 786-791). CLAUSE-Werte stehen in src/libespeak-ng/translate.h Z. 211-243, Period 40 Sentence, Komma 20 Clause, Frage 40 Sentence, Ausrufezeichen 45 Sentence, Doppelpunkt 30 Clause, Semikolon 30 Clause.",
+    "2026-10-30: espeak-ng Tag 1.52.0 und 1.51 ohne espeak_TextToPhonemesWithTerminator gelesen, Commit 724808c (2026-04-06, von piper1-gpl gebaut) und master mit der Funktion. piper1-gpl CMakeLists.txt baut espeak-ng aus GIT_TAG 724808c.",
+    "2026-10-30: Piper-Trainingsgraph geprueft: src/piper/train/export_onnx.py Z. 57-66 liest scales[0] als noise_scale, scales[1] als length_scale, scales[2] als noise_scale_w, Export-Inputs input, input_lengths, scales, sid. src/piper/train/vits/models.py Z. 795 rechnet w = torch.exp(logw) * x_mask * length_scale, length_scale wird also nicht invertiert.",
+    "2026-10-30: tests/test_voice.onnx.json ausgewertet: 159 Schluessel in phoneme_id_map, jeder Wert eine Liste mit genau einer ID, Diphthong-Schluessel aɪ bis oʊ mit 161 bis 165, Nummerierung 0 bis 165, inference.noise_w statt inference.noise_w_scale.",
+    "2026-10-30: Der Piper-Rechercheeintrag wurde in .brain/research.json ergaenzt (previous, last, history). Der Memory-Eintrag liegt im Memory-Plugin-Store unter scope learning/bkg-tts.zig. In .brain/memory.json wurde bewusst nichts geaendert, weil eine zweite Sitzung diese Datei parallel zum Thema Phonon und Kokoro pflegt.",
+    "2026-10-30: Der Laufzeitvertrag steht in docs/PIPER-PHONEMIZATION.md. Ein Pruefskript hat 58 Datei-und-Zeilen-Angaben des Dokuments gegen die lokale Quellkopie geprueft, 0 Abweichungen."
+   ],
+   "changed_files": [
+    ".brain/tasks.json",
+    ".brain/research.json",
+    "docs/PIPER-PHONEMIZATION.md"
+   ]
+  },
+  {
+   "id": "POCKET-RESEARCH-002",
+   "title": "PocketTTS-ONNX-Vertrag an echten Dateien verifizieren und als Bericht liefern",
+   "owner": "Mody (MiniMax-M3.1-Flash)",
+   "model": "minimaxai/minimax-m3.1-flash",
+   "tools": [
+    "shell",
+    "read",
+    "grep",
+    "write",
+    "edit"
+   ],
+   "skills": [
+    "communication-style"
+   ],
+   "started_at": "2026-10-30T01:30:00Z",
+   "scope": "Recherche ohne Aenderung an Laufzeit oder Modell. Quellen: /home/openchamber/dump/upstream-clones/pocket-tts, /home/openchamber/dump/pocket-research, ~/.local/share/onnxruntime",
+   "status": "completed",
+   "problem": "Fuer den Zig-Port waren der vollstaendige Inferenz-Algorithmus, der SentencePiece-Vertrag mit Feldnummern, die Encoder-Relation zwischen Samplezahl und Conditioning-Frames, die Zustaende der Step-Schleife, die WAV-Ausgabe, die EOS-Semantik und belastbare Referenzdateien offen.",
+   "plan": "Metadaten und SentencePiece-Proto der englischen Single-File per eigenem Protobuf-Parser lesen, den TypeScript-Tokenizer am echten Proto nachbilden, beide Encoder per ORT-C-API fahren, die Quellstellen mit Zeilennummern belegen und sieben nummerierte Antworten liefern.",
+   "verification": [
+    "2026-10-30: pocket-tts-english.onnx per ORT 1.22 C-API geprueft: 12 Eingänge, 7 Ausgänge. Namen und Shapes: tokens int64 [1,-1], latent float32 [1,-1,32], is_bos float32 [1,-1,1], cond float32 [1,-1,1024], gates float32 [3], noise float32 [1,32], flow_kv float32 [-1,6,2,1,16,64], flow_offset int64 Skalar, mimi_kv float32 [266,2,2,1,8,64], mimi_offset int64 Skalar, mimi_conv float32 [14720], decode_steps float32 Skalar. Ausgänge: audio float32 [1,1,1920], next_latent float32 [1,1,32], eos_logit float32 [1,1], flow_kv_new float32 [-1,6,2,1,16,64], mimi_kv_new float32 [16,2,2,1,8,64], mimi_offset_out int64 Skalar, mimi_conv_out float32 [14720].",
+    "2026-10-30: pocket-tts-english-ipa.onnx hat 13 Eingänge, der zusätzliche Eingang lora ist float32 als Skalar.",
+    "2026-10-30: Metadaten der englischen Single-File gemessen: pocket_tts_config 779 B JSON, pocket_tts_tokenizer 79120 B base64 gleich 59339 B Proto, pocket_tts_encoder 52244752 B base64 gleich 39183564 B ONNX, sechs Voice-Blobs pocket_tts_voice/<name>.",
+    "2026-10-30: Voice-Shapes aus pocket_tts_config: alba, cosette, javert, marius je [126,1024], anna [159,1024], michael [148,1024]. Die Blobs sind float16-Rohbytes, alba 258048 B gleich 129024 float16-Werte gleich 126 mal 1024.",
+    "2026-10-30: SentencePiece-Proto der englischen Datei per eigenem Parser gelesen: Top-Level-Felder 1 mit 4000 Pieces, 2 TrainerSpec, 3 NormalizerSpec. Feld 4 ist im Modell nicht belegt und laut Schema in sentencepiece_model.proto reserviert. Piece-Typen: 3740 NORMAL, 1 UNKNOWN, 3 CONTROL, 256 BYTE. IDs: <unk> 0, <s> 1, </s> 2, <pad> 3, Byte-Pieces 4 bis 259, Metazeichen 260.",
+    "2026-10-30: TrainerSpec: model_type 1 UNIGRAM, vocab_size 4000, character_coverage 0.9994999766349792, max_sentencepiece_length 6, byte_fallback true, unk_id 0, bos_id 1, eos_id 2, pad_id 3. Korrektur einer frueheren Notiz, die 32 nannte.",
+    "2026-10-30: NormalizerSpec: name identity, precompiled_charsmap leer, add_dummy_prefix 1, remove_extra_whitespaces 0, escape_whitespaces nicht serialisiert, also Default true.",
+    "2026-10-30: TypeScript-Parser belegt: packages/pocket-tts-onnx/src/sentencepiece.ts:88-90 liest add_dummy_prefix aus Top-Level-Feld 4, das nie belegt ist. Die korrekte Funktion parseNormalizer in Zeile 114-125 liest Feld 3 von NormalizerSpec, wird aber nie aufgerufen. Ein synthetisches Proto mit add_dummy_prefix gleich false liefert im TS-Parser weiterhin true.",
+    "2026-10-30: Encoder per ORT-C-API gefahren, en-encoder.onnx und de-encoder.onnx liefern cond float32 [1,frames,1024] mit frames gleich floor(samples/1920) plus 1. Gemessen: 1920 Samples gleich 2 Frames, 5760 gleich 4, 19200 gleich 11, 5000 gleich 3. Cond-Zeile 0 ist ueber verschiedene Audioinhalte bitgleich, Differenz 0.0, Zeile 1 ist inhaltsabhaengig mit Differenz 1.14 beim englischen und 2.53 beim deutschen Encoder.",
+    "2026-10-30: pip install sentencepiece scheitert an voller tmpfs unter /tmp, Fehler OSError Errno 28. Ein Token-ID-Vergleich gegen das echte sentencepiece-Paket war deshalb nicht moeglich. Der TS-Tokenizer wurde per eigener Python-Nachbildung am echten Proto geprueft.",
+    "2026-10-30: Keine Projektdatei fuer die Laufzeit geaendert. Probe-Artefakte liegen unter /home/openchamber/.cache/probe/, die Metadaten- und Proto-Auswertung unter /tmp/opencode/sp_verify.py."
+   ],
+   "changed_files": [
+    ".brain/tasks.json",
+    ".brain/research.json",
+    ".brain/memory.json"
+   ]
+  },
+  {
+   "id": "SHERPA-KOKORO-CONTRACT-003",
+   "title": "Modellvertrag der sherpa-onnx Kokoro-Variante kokoro-en-v0_19 recherchieren (Style-Index, tokens.txt, espeak, Modell-I/O, Metadaten, Stimmen)",
+   "owner": "Mody (MiniMax-M3.1-Flash)",
+   "model": "minimaxai/minimax-m3.1-flash",
+   "tools": [
+    "execute",
+    "shell",
+    "read",
+    "grep",
+    "edit",
+    "write",
+    "memory_remember",
+    "memory_update"
+   ],
+   "skills": [],
+   "started_at": "2026-10-30T01:25:00Z",
+   "scope": "Recherche ohne Aenderung am Projektcode. Quellen: sherpa-onnx Master 935e5ded3d949a8b557ac44ef4dad03a7d2038e7 und Espeak-Zeitraum 6982b86c6617, piper-phonemize 78a788e0b719013401572d70fef372e77bff8e43, hexgrad/kLegacy v0.19 lokal, Modellverzeichnis ~/.config/openchamber/speech-models/kokoro-en-v0_19.",
+   "status": "completed",
+   "problem": "Fuer den Zig-Port war offen, wie sherpa-onnx den Style-Vektor fuer kokoro-en-v0_19 waehlt, wie tokens.txt gelesen wird, welche Tokenfolge mit espeak entsteht, welche Ein- und Ausgaenge das ONNX-Modell erwartet, wie speed wirkt, welche Metadaten im Modell stehen und welche Stimmen es gibt.",
+   "plan": "Zwei sherpa-onnx-Staende ueber die GitHub-API und raw.githubusercontent.com lesen, Style-Formel und Tokenisierung im Quelltext belegen, die espeak-Aufrufe im piper-phonemize nachweisen, Modell-I/O und Metadaten lokal am model.onnx messen, tokens.txt und voices.bin binaer pruefen und alle Zitate per Substring-Abgleich gegen die Quelldateien verifizieren.",
+   "verification": [
+    "2026-10-30: sherpa-onnx-Staende ueber die GitHub-API geprueft: Master 935e5ded3d949a8b557ac44ef4dad03a7d2038e7 vom 2026-10-29 (Refactor CI for Python tests, #4136) und Espeak-Zeitraum 6982b86c6617 vom 2025-06-20. Die Links im Bericht sind auf die SHA gepinnt, weil der Branch master weiterlaeuft.",
+    "2026-10-30: Style-Index im Quelltext belegt: row = speaker_id * 511 + (token_count - 2), token_count ist die Laenge des Tokens-Tensors inklusive PAD 0 vorne und hinten. csrc/offline-tts-kokoro-model.cc Z. 70-85 ist in beiden Staenden identisch, style_dim aus den Metadaten gleich 511,1,256.",
+    "2026-10-30: Master-Baum geprueft: 729 Dateien unter sherpa-onnx/csrc, keine piper-phonemize-lexicon.cc und keine espeak-Dateien mehr, cmake ohne piper- oder espeak-Datei, die verbliebenen piper-Dateien im Repo sind Beispielskripte fuer VITS- und Piper-Modelle. Master-Kokoro includiert symbol-table.h und tts-text-normalizer.h, ReadTokens in csrc/symbol-table.cc Z. 110-156, Lexikon-Pflicht --kokoro-lexicon in csrc/offline-tts-kokoro-impl.h Z. 570-573, PAD-Rahmen Z. 783-788.",
+    "2026-10-30: Tokenisierung im Espeak-Zeitraum belegt: PiperPhonemesToIdsKokoroOrKitten in csrc/piper-phonemize-lexicon.cc Z. 205-239 mit Start-PAD 0, je Phonem die ID, nach Punkt zusaetzlich die Space-ID, Ende-PAD 0, uebersprungenen unbekannten Phonemen und Chunk-Split ueber 510 Eintraege. ConvertTextToTokenIdsKokoroOrKitten Z. 486-512.",
+    "2026-10-30: espeak-Aufruf belegt: piper-phonemize Commit 78a788e0b719013401572d70fef372e77bff8e43 src/phonemize.cpp Z. 17-134 mit espeak_SetVoiceByName, espeak_TextToPhonemesWithTerminator, textmode espeakCHARS_AUTO, Phonememodus 0x02 fuer IPA, NFD-Normalisierung und Filter der Sprachflags. InitEspeak Z. 299-327 ruft espeak_Initialize(AUDIO_OUTPUT_SYNCHRONOUS, 0, data_dir, 0), data_dir kommt aus --kokoro-data-dir.",
+    "2026-10-30: tokens.txt geprueft: Schema <symbol> <id> mit genau einem Codepoint je Symbol, <BLNK> wird uebersprungen, Duplikate sind im Espeak-Zeitraum ein Fehler (ReadTokens Z. 72-122). Die lokale Datei ist byte-identisch mit scripts/kokoro/v0.19/generate_tokens.py, 1078 Byte, 177 Zeilen, IDs 0 bis 173 und 175 bis 177, ID 174 unbelegt, Apostroph auf 176.",
+    "2026-10-30: Modell-I/O lokal am model.onnx verifiziert: inputs tokens int64 [1,'tokens1'], style float32 [1,256], speed float32 [1], output audio float32 ['audio0']. speed geht unveraendert ins Modell, kokoro-length_scale wirkt nur bei speed gleich 1 als 1/length_scale, speed kleiner 0 wird abgelehnt.",
+    "2026-10-30: CustomMetadataMap vollstaendig gelesen: model_type kokoro, language English, has_espeak 1, sample_rate 24000, version 1, voice en-us, style_dim 511,1,256, n_speakers 11, speaker2id, id2speaker, speaker_names, model_url https://huggingface.co/hexgrad/kLegacy/, see_also https://huggingface.co/spaces/hexgrad/Kokoro-TTS, maintainer k2-fsa, comment This is kokoro v0.19 and supports only English.",
+    "2026-10-30: Stimmen 0 bis 10 belegt: af, af_bella, af_nicole, af_sarah, af_sky, am_adam, am_michael, bf_emma, bf_isabella, bm_george, bm_lewis, Reihenfolge aus scripts/kokoro/v0.19/generate_voices_bin.py Z. 7-19 mit Schreibblock Z. 29-38. voices.bin ist 5755904 Byte gleich 11 mal 511 mal 256 float32 ohne Header.",
+    "2026-10-30: Optionale Textnormalisierung im Espeak-Zeitraum belegt: --rule-fsts und --rule-fars werden in csrc/offline-tts-kokoro-impl.h Z. 38-84 und Z. 94-134 eingelesen und in Z. 224-235 angewandt, danach folgt ConvertTextToTokenIds. sherpa-onnx macht keine Wortexpansion und keine Gross-/Klein-Umformung, das macht nur die Upstream-Referenz kokoro.py mit normalize_text Z. 47-73 und phonemize Z. 94-107.",
+    "2026-10-30: Alle Codezitate per Substring-Abgleich gegen die Quelldateien geprueft. Acht Korrekturen am ersten Entwurf: Codepoint U+0289 statt U+0249 in generate_tokens.py Z. 10, zwei ausgelassene Kommentarzeilen, Write-Block Z. 29-38 statt 26-38, rule_fsts Z. 38-84 und Z. 94-134, Normalize Z. 224-235, test.py NodeArg Z. 71-75, test.py Ersetzungen Z. 147-149, preserve_punctuation in kokoro.py Z. 91-92.",
+    "2026-10-30: Herkunft der Upstream-Referenz geprueft: das GitHub-Repo hexgrad/kLegacy liefert per API 404, der Space hexgrad/Kokoro-TTS hatte in 256 Revisionen ab 2024-11-02 keine kokoro.py, das PyPI-Paket kokoro bis 0.9.4 enthaelt keine kokoro.py, und im Repo hexgrad/Kokoro gibt es keinen Commit fuer den Pfad kokoro.py. Gelesen wurde die lokale Kopie mit sha256 c75f024b69271b58e167a54b63505bb4e3d9e111bf31f156b60f8565eaa5fb46."
+   ],
+   "changed_files": [
+    ".brain/tasks.json",
+    ".brain/research.json",
+    ".brain/memory.json"
+   ]
+  },
+  {
+   "id": "ENGINE-001",
+   "title": "Universelle TTS-Engine mit Modell-Registry aufbauen",
+   "owner": "Mody (MiniMax-M3.1-Flash)",
+   "model": "minimaxai/minimax-m3.1-flash",
+   "tools": [
+    "execute",
+    "shell",
+    "edit",
+    "write",
+    "read"
+   ],
+   "skills": [
+    "openchamber-change-discipline",
+    "performance-engineering",
+    "bkg-zero"
+   ],
+   "started_at": "2026-10-30T03:20:00Z",
+   "scope": "src/tts/**, src/engine.zig, src/api.zig, src/config.zig, src/main.zig, src/realtime.zig, docs/**",
+   "status": "in_progress",
+   "problem": "Der Server ist an die Magpie-C-ABI gebunden und kann kein fremdes Modell ohne Codeaenderung laden. Der Nutzer verlangt eine vollstaendig selbst geschriebene Engine, die jedes ueber einen Deskriptor beschriebene Modell nutzt.",
+   "plan": "Deskriptor-Format fuer Modellfamilie, Textpfad, Stimmquelle und Backend festlegen. Registry mit Hot-Swap, Backends fuer Style-Token-Modelle (Kokoro, Kitten) und Phonem-ID-Modelle (Piper), danach PocketTTS-Step-Backend. Serverpfad auf Registry umstellen und mit echten ONNX-Modellen verifizieren.",
+   "verification": [],
+   "changed_files": []
   }
+ ],
+ "last": {
+  "id": "ENGINE-001",
+  "title": "Universelle TTS-Engine mit Modell-Registry aufbauen",
+  "owner": "Mody (MiniMax-M3.1-Flash)",
+  "model": "minimaxai/minimax-m3.1-flash",
+  "tools": [
+   "execute",
+   "shell",
+   "edit",
+   "write",
+   "read"
+  ],
+  "skills": [
+   "openchamber-change-discipline",
+   "performance-engineering",
+   "bkg-zero"
+  ],
+  "started_at": "2026-10-30T03:20:00Z",
+  "scope": "src/tts/**, src/engine.zig, src/api.zig, src/config.zig, src/main.zig, src/realtime.zig, docs/**",
+  "status": "in_progress"
+ }
 }

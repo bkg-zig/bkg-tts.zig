@@ -287,6 +287,25 @@ pub const Session = struct {
         self.* = undefined;
     }
 
+    /// Sucht den Eingang mit diesem Namen und liefert seinen Index.
+    ///
+    /// Der Deskriptor nennt die Ein- und Ausgaenge des Graphen beim Namen.
+    /// Die Reihenfolge im Graphen darf sich deshalb nicht im Code stehen.
+    pub fn inputIndexByName(self: *const Session, name: []const u8) ?usize {
+        for (self.input_names, 0..) |candidate, index| {
+            if (std.mem.eql(u8, candidate, name)) return index;
+        }
+        return null;
+    }
+
+    /// Sucht den Ausgang mit diesem Namen und liefert seinen Index.
+    pub fn outputIndexByName(self: *const Session, name: []const u8) ?usize {
+        for (self.output_names, 0..) |candidate, index| {
+            if (std.mem.eql(u8, candidate, name)) return index;
+        }
+        return null;
+    }
+
     /// Liefert Form und Elementtyp eines Eingangs.
     pub fn inputInfo(
         self: *const Session,
@@ -325,18 +344,22 @@ pub const Session = struct {
             failure.set(0, "Session lieferte keine Typinformation");
             return error.MissingHandle;
         };
-        defer ort.f98.?(info);
 
         var onnx_type: c_int = 0;
         try check(ort, ort.f56.?(info, &onnx_type), failure);
         if (onnx_type != onnx_type_tensor) {
+            ort.f98.?(info);
             failure.set(0, "Ein- oder Ausgang ist kein Tensor");
             return error.UnsupportedType;
         }
 
+        // CastTypeInfoToTensorInfo legt kein zweites Objekt an, sondern
+        // liefert denselben Speicher zurueck. Deshalb wird der Typinfo-
+        // Handle nach dem Cast nicht zusaetzlich freigegeben.
         var shape_info: ?*api.OrtTensorTypeAndShapeInfo = null;
         try check(ort, ort.f55.?(info, &shape_info), failure);
         const tensor_info = shape_info orelse {
+            ort.f98.?(info);
             failure.set(0, "CastTypeInfoToTensorInfo lieferte keine Forminfo");
             return error.MissingHandle;
         };
