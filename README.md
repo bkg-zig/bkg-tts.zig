@@ -31,3 +31,4 @@ Setze `BKG_MAGPIE_MODEL=/pfad/zum/modell.gguf`; optional `BKG_MAGPIE_LIB_PATH=/p
 Erfolgreich ausgeführt: `zig build`, `zig build test`, `zig build wasm`, TypeScript-`tsc -b` und Vite-Produktionsbuild. Ein echter HTTP-Synthesetest über den Zig-Server lieferte 22,05-kHz-Mono-WAV, 16-Bit-PCM, 6,037 Sekunden und messbar nicht-stille Samples. Das C++-Shared-Library-Ziel wurde mit CPU-only-Flags gebaut.
 
 Die vollständige Legacy-Parität ist noch nicht fertig. Siehe `TASKS.md` und `docs/API-COMPAT.md`; die Produktionsroute wurde nicht umgeschaltet.
+# bkg-tts.zig
