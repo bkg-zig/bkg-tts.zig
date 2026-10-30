@@ -1,0 +1,4 @@
+services:
+  bkg-magpietts-zig:
+    ports:
+      - "127.0.0.1:${MAGPIE_HOST_PORT:-18093}:8092"

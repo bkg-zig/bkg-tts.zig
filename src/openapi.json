@@ -1,0 +1,537 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "BKG MagpieTTS API",
+    "version": "0.1.0",
+    "description": "Native CPU-only Zig service, using the magpie-tts.cpp C ABI. Unsupported legacy options/endpoints return explicit errors. Realtime uses the WebSocket event protocol documented in /docs/REALTIME.md. Native benchmark is serial (concurrent_users=1), iterations 1-10. WAV/PCM synthesis uses the model-default CFG and 22050 Hz; unsupported overrides are rejected."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Liveness",
+        "responses": {
+          "200": {
+            "description": "HTTP server is alive"
+          }
+        }
+      }
+    },
+    "/ready": {
+      "get": {
+        "summary": "Model readiness",
+        "responses": {
+          "200": {
+            "description": "Model loaded"
+          },
+          "503": {
+            "description": "Model not ready"
+          }
+        }
+      }
+    },
+    "/api/system": {
+      "get": {
+        "summary": "System, model and CPU runtime status",
+        "responses": {
+          "200": {
+            "description": "Runtime status and request counters"
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "summary": "Prometheus metrics",
+        "responses": {
+          "200": {
+            "description": "Prometheus text exposition format"
+          }
+        }
+      }
+    },
+    "/v1/models": {
+      "get": {
+        "summary": "List models",
+        "responses": {
+          "200": {
+            "description": "Model list"
+          }
+        }
+      }
+    },
+    "/v1/models/{model_id}": {
+      "get": {
+        "summary": "Get model detail",
+        "responses": {
+          "200": {
+            "description": "Model detail"
+          },
+          "404": {
+            "description": "Unknown model"
+          }
+        },
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/audio/speech": {
+      "post": {
+        "summary": "OpenAI-compatible TTS. Native runtime supports WAV/PCM, 22050 Hz, model-default CFG.",
+        "responses": {
+          "200": {
+            "description": "Audio bytes"
+          },
+          "400": {
+            "description": "Malformed JSON"
+          },
+          "404": {
+            "description": "Unknown model"
+          },
+          "422": {
+            "description": "Invalid/unsupported setting"
+          },
+          "503": {
+            "description": "Model not ready"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "input"
+                ],
+                "properties": {
+                  "model": {
+                    "type": "string",
+                    "default": "magpie-tts-multilingual-357m"
+                  },
+                  "input": {
+                    "type": "string",
+                    "maxLength": 5000
+                  },
+                  "voice": {
+                    "type": "string",
+                    "enum": [
+                      "aria",
+                      "jason",
+                      "john",
+                      "leo",
+                      "sofia"
+                    ],
+                    "default": "aria"
+                  },
+                  "language": {
+                    "type": "string",
+                    "default": "en"
+                  },
+                  "response_format": {
+                    "type": "string",
+                    "enum": [
+                      "wav",
+                      "pcm"
+                    ],
+                    "default": "wav"
+                  },
+                  "speed": {
+                    "type": "number",
+                    "default": 1
+                  },
+                  "sample_rate": {
+                    "type": "integer",
+                    "default": 22050
+                  },
+                  "stream": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "text_normalization": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "cfg_enabled": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "cfg_scale": {
+                    "type": "number",
+                    "default": 2.5
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/audio/cancel": {
+      "post": {
+        "summary": "Cancel synthesis",
+        "responses": {
+          "501": {
+            "description": "In-flight synchronous C-ABI call cannot yet be interrupted"
+          }
+        }
+      }
+    },
+    "/v1/audio/voices": {
+      "get": {
+        "summary": "List available voices",
+        "responses": {
+          "200": {
+            "description": "Voice list"
+          }
+        }
+      }
+    },
+    "/v1/audio/list_voices": {
+      "get": {
+        "summary": "Legacy alias for voice list",
+        "responses": {
+          "200": {
+            "description": "Voice list"
+          }
+        }
+      }
+    },
+    "/api/voices": {
+      "get": {
+        "summary": "Voice metadata",
+        "responses": {
+          "200": {
+            "description": "Voice metadata list"
+          }
+        }
+      }
+    },
+    "/api/languages": {
+      "get": {
+        "summary": "Languages supported by native tokenizer",
+        "responses": {
+          "200": {
+            "description": "Native language list"
+          }
+        }
+      }
+    },
+    "/api/tts/generate": {
+      "post": {
+        "summary": "Native synthesis API",
+        "responses": {
+          "200": {
+            "description": "Audio bytes"
+          },
+          "422": {
+            "description": "Unsupported setting"
+          },
+          "503": {
+            "description": "Model unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "text"
+                ],
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "maxLength": 5000
+                  },
+                  "language": {
+                    "type": "string",
+                    "default": "en"
+                  },
+                  "speaker": {
+                    "type": "string",
+                    "default": "Aria"
+                  },
+                  "text_normalization": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "stream": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "audio": {
+                    "type": "object",
+                    "properties": {
+                      "format": {
+                        "type": "string",
+                        "enum": [
+                          "wav",
+                          "pcm"
+                        ]
+                      },
+                      "sample_rate": {
+                        "type": "integer",
+                        "default": 22050
+                      }
+                    }
+                  },
+                  "cfg": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean",
+                        "default": true
+                      },
+                      "scale": {
+                        "type": "number",
+                        "default": 2.5
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tts/pronunciation": {
+      "get": {
+        "summary": "List pronunciation entries",
+        "responses": {
+          "200": {
+            "description": "Dictionary entries persisted as JSON"
+          },
+          "501": {
+            "description": "Not ported yet"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create/update pronunciation entry",
+        "responses": {
+          "200": {
+            "description": "Entry inserted/updated"
+          },
+          "422": {
+            "description": "Invalid entry"
+          },
+          "501": {
+            "description": "Not ported yet"
+          }
+        }
+      }
+    },
+    "/api/tts/pronunciation/{word}": {
+      "delete": {
+        "summary": "Delete pronunciation entry",
+        "responses": {
+          "200": {
+            "description": "Entry deleted"
+          },
+          "404": {
+            "description": "Entry not found"
+          },
+          "501": {
+            "description": "Not ported yet"
+          }
+        },
+        "parameters": [
+          {
+            "name": "word",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "en"
+            }
+          }
+        ]
+      }
+    },
+    "/api/tts/pronunciation/test": {
+      "post": {
+        "summary": "Test pronunciation entry",
+        "responses": {
+          "200": {
+            "description": "Real WAV generated with the selected dictionary entry"
+          },
+          "503": {
+            "description": "Model not ready"
+          },
+          "501": {
+            "description": "Not ported yet"
+          }
+        }
+      }
+    },
+    "/api/profiles": {
+      "get": {
+        "summary": "List CPU engine profile",
+        "responses": {
+          "200": {
+            "description": "Single CPU profile"
+          }
+        }
+      }
+    },
+    "/api/profiles/switch": {
+      "post": {
+        "summary": "Switch profile",
+        "responses": {
+          "409": {
+            "description": "Only fixed CPU profile exists"
+          }
+        }
+      }
+    },
+    "/api/selftest": {
+      "post": {
+        "summary": "Run self-test",
+        "responses": {
+          "200": {
+            "description": "Real native speech-audio check"
+          },
+          "503": {
+            "description": "Model not ready"
+          },
+          "501": {
+            "description": "Not ported yet"
+          }
+        }
+      }
+    },
+    "/api/logs": {
+      "get": {
+        "summary": "Read recent logs",
+        "responses": {
+          "200": {
+            "description": "Recent request metadata (no customer text or secrets)"
+          },
+          "501": {
+            "description": "Not ported yet"
+          }
+        },
+        "parameters": [
+          {
+            "name": "lines",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 200
+            }
+          }
+        ]
+      }
+    },
+    "/api/reload": {
+      "post": {
+        "summary": "Reload runtime config",
+        "responses": {
+          "200": {
+            "description": "Pronunciation dictionary reloaded"
+          },
+          "501": {
+            "description": "Not ported yet"
+          }
+        }
+      }
+    },
+    "/api/benchmark": {
+      "post": {
+        "summary": "Benchmark synthesis",
+        "responses": {
+          "200": {
+            "description": "Real serial CPU synthesis timing"
+          },
+          "409": {
+            "description": "Unsupported profile"
+          },
+          "422": {
+            "description": "Unsupported concurrency or streaming option"
+          },
+          "503": {
+            "description": "Model not ready"
+          },
+          "501": {
+            "description": "Not ported yet"
+          }
+        }
+      }
+    },
+    "/v1/realtime": {
+      "get": {
+        "summary": "Realtime synthesis WebSocket",
+        "responses": {
+          "101": {
+            "description": "WebSocket upgrade"
+          }
+        },
+        "description": "Events: session.update, input_text.append, input_text.commit, response.cancel, ping. Server: session.created, session.updated, response.created, audio.chunk, response.completed, response.cancelled, error, pong.",
+        "parameters": [
+          {
+            "name": "intent",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "synthesize"
+            }
+          }
+        ],
+        "x-websocket-protocol": "Audio chunks are cut from the generated PCM buffer per flushed phrase; C ABI does not yet expose tokenwise inference."
+      }
+    },
+    "/docs": {
+      "get": {
+        "summary": "API docs overview",
+        "responses": {
+          "200": {
+            "description": "HTML documentation"
+          }
+        }
+      }
+    },
+    "/redoc": {
+      "get": {
+        "summary": "API reference overview",
+        "responses": {
+          "200": {
+            "description": "HTML API reference"
+          }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "summary": "OpenAPI document",
+        "responses": {
+          "200": {
+            "description": "OpenAPI schema"
+          }
+        }
+      }
+    }
+  }
+}

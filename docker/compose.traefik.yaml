@@ -1,0 +1,9 @@
+services:
+  bkg-magpietts-zig:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=bkg_net"
+      - "traefik.http.routers.bkg-magpietts-zig.rule=Host(`${MAGPIE_TRAEFIK_HOST:?set MAGPIE_TRAEFIK_HOST}`)"
+      - "traefik.http.routers.bkg-magpietts-zig.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}"
+      - "traefik.http.routers.bkg-magpietts-zig.tls=true"
+      - "traefik.http.services.bkg-magpietts-zig.loadbalancer.server.port=8092"

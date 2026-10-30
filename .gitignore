@@ -1,0 +1,9 @@
+.zig-cache/
+zig-out/
+build/
+*.wav
+*.pcm
+*.log
+web/node_modules/
+web/dist/
+web/public/wasm/*.wasm

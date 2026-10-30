@@ -1,0 +1,43 @@
+services:
+  bkg-magpietts-zig:
+    image: ${BKG_MAGPIETTS_IMAGE:-bkg-magpietts-zig:latest}
+    container_name: bkg-magpietts-zig
+    restart: unless-stopped
+    init: true
+    environment:
+      MAGPIE_HOST: "0.0.0.0"
+      MAGPIE_PORT: "8092"
+      MAGPIE_DEVICE: "cpu"
+      BKG_MAGPIE_LIB_PATH: "/usr/local/lib/libmagpie-tts.so"
+      BKG_MAGPIE_MODEL: "/srv/magpie/models/magpie-tts-multilingual-357m-q8_0.gguf"
+      MAGPIE_WEB_DIST: "/srv/magpie/web/dist"
+      MAGPIE_PRONUNCIATION_PATH: "/srv/magpie/data/pronunciation.json"
+    volumes:
+      - ${MAGPIE_MODEL_DIR:-/srv/bkg/services/bkg-magpietts/models}:/srv/magpie/models:ro
+      - magpietts-data:/srv/magpie/data
+    expose:
+      - "8092"
+    networks:
+      - bkg_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8092/health >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 3s
+      start_period: 180s
+      retries: 3
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    stop_grace_period: 30s
+
+networks:
+  bkg_net:
+    external: true
+    name: bkg_net
+
+volumes:
+  magpietts-data:

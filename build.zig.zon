@@ -1,0 +1,19 @@
+.{
+    .name = .bkg_magpietts,
+    .fingerprint = 0xb4c84866af132e82,
+    .version = "0.1.0",
+    .minimum_zig_version = "0.16.0",
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "web",
+        "README.md",
+        "TASKS.md",
+        "docs",
+        "scripts",
+        "docker",
+        "Dockerfile",
+        ".gitignore",
+    },
+}
