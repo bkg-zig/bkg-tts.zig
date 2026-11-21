@@ -617,7 +617,7 @@ fn readTensor(
         return error.MissingHandle;
     };
 
-    const width = @intFromEnum(@as(ElementType, @enumFromInt(element_type))).byteSize();
+    const width = (@as(ElementType, @enumFromInt(element_type))).byteSize();
     if (width == 0) {
         failure.set(0, "Der Ausgabetyp hat keine feste Bytebreite");
         return error.UnsupportedType;

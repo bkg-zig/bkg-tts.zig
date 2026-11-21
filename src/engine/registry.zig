@@ -1,9 +1,15 @@
 //! Registry der verfuegbaren Modelle.
 //!
-//! Die Registry liest ein Verzeichnis mit einer JSON-Datei je Modell. Jede
-//! Datei ist ein Deskriptor und nennt ueber das Feld "model" die Kennung des
-//! Modells. Zusaetzlich kann eine Datei `registry.json` die benutzten Modelle
-//! benennen, ihre Reihenfolge festlegen und das Vorgabemodell benennen.
+//! Die Registry liest ein Verzeichnis mit den Modellen. Ein Modell kann auf
+//! zwei Arten beschrieben sein:
+//!
+//! * Eine JSON-Datei im Verzeichnis selbst ist ein Deskriptor.
+//! * Ein Unterverzeichnis mit der Datei `config.json` ist ein Modellordner.
+//!   Der Deskriptor liegt neben den Gewichten, damit relative Pfade stimmen.
+//!
+//! Der Deskriptor nennt ueber das Feld "model" die Kennung des Modells.
+//! Zusaetzlich kann eine Datei `registry.json` die benutzten Modelle benennen,
+//! ihre Reihenfolge festlegen und das Vorgabemodell benennen.
 //!
 //! Die Registry kennt keine Modellfamilie. Sie sammelt Deskriptoren, vergleicht
 //! deren Fingerabdruecke und meldet, welche Modelle sich geaendert haben.
@@ -14,17 +20,30 @@ const descriptor = @import("../tts/descriptor.zig");
 /// Name der Datei, die die Liste der Modelle enthaelt.
 pub const list_file = "registry.json";
 
+/// Name der Deskriptordatei in einem Modellordner.
+pub const descriptor_file = "config.json";
+
 /// Hoechstgroesse der Datei mit der Modelliste.
 const max_list_bytes = 1024 * 1024;
 
 /// Ein Modell der Registry.
 pub const Entry = struct {
     /// Kennung des Modells. Sie steht im Feld "model" des Deskriptors.
+    /// Die Registry besitzt eine eigene Kopie. Die Kennung bleibt damit
+    /// gueltig, auch wenn der Deskriptor ausgetauscht wird.
     id: []const u8,
     /// Pfad der Deskriptordatei.
     path: []const u8,
     /// Der gelesene Deskriptor.
     descriptor: descriptor.Descriptor,
+
+    /// Gibt alle Teile des Eintrags frei.
+    pub fn deinit(self: *Entry, gpa: std.mem.Allocator) void {
+        gpa.free(self.id);
+        gpa.free(self.path);
+        self.descriptor.deinit();
+        self.* = undefined;
+    }
 };
 
 /// Aenderungen, die ein Neuladen gefunden hat.
@@ -69,10 +88,7 @@ pub const Registry = struct {
     active_id: ?[]const u8 = null,
 
     pub fn deinit(self: *Registry) void {
-        for (self.entries.items) |*entry| {
-            entry.descriptor.deinit();
-            self.gpa.free(entry.path);
-        }
+        for (self.entries.items) |*entry| entry.deinit(self.gpa);
         self.entries.deinit(self.gpa);
         self.order.deinit(self.gpa);
         if (self.default_id) |id| self.gpa.free(id);
@@ -157,53 +173,36 @@ pub const Registry = struct {
         var removed = std.ArrayList([]const u8).empty;
         defer removed.deinit(self.gpa);
 
-        // Fuer jedes alte Modell merken wir, ob sein Deskriptor unveraendert in
-        // die neue Liste uebernommen wurde. Nur dann darf der alte Deskriptor
-        // nicht freigegeben werden.
-        const kept = try self.gpa.alloc(bool, self.entries.items.len);
-        defer self.gpa.free(kept);
-        @memset(kept, false);
-
-        // Fuer jedes alte Modell merken wir, ob es ueberhaupt noch gibt.
-        const present = try self.gpa.alloc(bool, self.entries.items.len);
-        defer self.gpa.free(present);
-        @memset(present, false);
-
+        // Jedes neue Modell wird mit dem alten verglichen. Der Fingerabdruck
+        // des Deskriptors zeigt, ob sich das Modell geaendert hat.
         for (scan.entries.items) |*new_entry| {
             const old_index = self.indexOf(new_entry.id) orelse {
                 try added.append(self.gpa, try self.gpa.dupe(u8, new_entry.id));
                 continue;
             };
-            present[old_index] = true;
 
             const old_entry = &self.entries.items[old_index];
-            if (old_entry.descriptor.fingerprint() == new_entry.descriptor.fingerprint()) {
-                // Unveraendert. Der alte Deskriptor bleibt in der Registry.
-                new_entry.descriptor.deinit();
-                self.gpa.free(new_entry.path);
-                new_entry.descriptor = old_entry.descriptor;
-                new_entry.path = old_entry.path;
-                kept[old_index] = true;
-                continue;
-            }
+            if (old_entry.descriptor.fingerprint() == new_entry.descriptor.fingerprint()) continue;
 
             try changed.append(self.gpa, try self.gpa.dupe(u8, new_entry.id));
         }
 
-        for (self.entries.items, 0..) |*old_entry, index| {
-            if (!present[index]) {
+        for (self.entries.items) |old_entry| {
+            if (findIndex(scan.entries.items, old_entry.id) == null) {
                 try removed.append(self.gpa, try self.gpa.dupe(u8, old_entry.id));
             }
-            if (kept[index]) continue;
-            old_entry.descriptor.deinit();
-            self.gpa.free(old_entry.path);
         }
 
+        // Die alten Eintraege werden vollstaendig freigegeben. Das geladene
+        // Modell besitzt eine eigene Kopie seines Deskriptors und bleibt
+        // davon unberuehrt.
+        for (self.entries.items) |*entry| entry.deinit(self.gpa);
         self.entries.deinit(self.gpa);
         self.entries = scan.entries;
+        scan.entries = .empty;
+
         self.order.deinit(self.gpa);
         self.order = scan.order;
-        scan.entries = .empty;
         scan.order = .empty;
 
         // Das Vorgabemodell kann sich mit der Datei registry.json geaendert
@@ -252,10 +251,7 @@ pub const Registry = struct {
 
         var entries = try self.parseEntries(io, files.items);
         errdefer {
-            for (entries.items) |*entry| {
-                entry.descriptor.deinit();
-                self.gpa.free(entry.path);
-            }
+            for (entries.items) |*entry| entry.deinit(self.gpa);
             entries.deinit(self.gpa);
         }
 
@@ -306,26 +302,62 @@ pub const Registry = struct {
     fn parseEntries(self: *Registry, io: std.Io, files: []const []const u8) !std.ArrayList(Entry) {
         var entries = std.ArrayList(Entry).empty;
         errdefer {
-            for (entries.items) |*entry| {
-                entry.descriptor.deinit();
-                self.gpa.free(entry.path);
-            }
+            for (entries.items) |*entry| entry.deinit(self.gpa);
             entries.deinit(self.gpa);
         }
 
         for (files) |path| {
-            var parsed = try descriptor.load(self.gpa, io, path);
-            errdefer parsed.deinit();
+            // Eine Datei, die kein Deskriptor ist, darf die Registry nicht
+            // zerstoeren. Solche Dateien kommen vor, weil das Modellverzeichnis
+            // auch fremde Konfigurationen enthaelt. Sie werden gemeldet und
+            // uebersprungen.
+            var parsed = descriptor.load(self.gpa, io, path) catch |err| {
+                std.log.warn(
+                    "Deskriptor {s} wurde uebersprungen: {s}",
+                    .{ path, @errorName(err) },
+                );
+                continue;
+            };
 
+            var duplicate = false;
             for (entries.items) |existing| {
-                if (std.mem.eql(u8, existing.id, parsed.model)) return error.DuplicateModel;
+                if (std.mem.eql(u8, existing.id, parsed.model)) {
+                    duplicate = true;
+                    break;
+                }
             }
 
-            try entries.append(self.gpa, .{
-                .id = parsed.model,
-                .path = try self.gpa.dupe(u8, path),
+            if (duplicate) {
+                std.log.warn(
+                    "Deskriptor {s} wurde uebersprungen: die Kennung {s} ist schon vergeben",
+                    .{ path, parsed.model },
+                );
+                parsed.deinit();
+                continue;
+            }
+
+            // Die Kennung und der Pfad gehoeren der Registry. Die Kennung im
+            // Deskriptor liegt in dessen Arena und waere nach dem Ausbauen
+            // des Deskriptors ungueltig.
+            const owned_id = self.gpa.dupe(u8, parsed.model) catch {
+                parsed.deinit();
+                return error.OutOfMemory;
+            };
+            errdefer self.gpa.free(owned_id);
+
+            const owned_path = self.gpa.dupe(u8, path) catch {
+                parsed.deinit();
+                return error.OutOfMemory;
+            };
+            entries.append(self.gpa, .{
+                .id = owned_id,
+                .path = owned_path,
                 .descriptor = parsed,
-            });
+            }) catch {
+                self.gpa.free(owned_path);
+                parsed.deinit();
+                return error.OutOfMemory;
+            };
         }
 
         return entries;
@@ -346,12 +378,26 @@ pub const Registry = struct {
 
         var iterator = dir.iterate();
         while (try iterator.next(io)) |entry| {
-            if (entry.kind != .file) continue;
-            if (!std.mem.endsWith(u8, entry.name, ".json")) continue;
-            if (std.mem.eql(u8, entry.name, list_file)) continue;
+            switch (entry.kind) {
+                .file => {
+                    if (!std.mem.endsWith(u8, entry.name, ".json")) continue;
+                    if (std.mem.eql(u8, entry.name, list_file)) continue;
 
-            const path = try std.fs.path.join(mem, &.{ self.dir, entry.name });
-            try files.append(mem, path);
+                    const path = try std.fs.path.join(mem, &.{ self.dir, entry.name });
+                    try files.append(mem, path);
+                },
+                .directory, .sym_link => {
+                    // Jedes Unterverzeichnis kann ein Modellordner sein. Sein
+                    // Deskriptor heisst config.json und liegt neben den
+                    // Gewichten, damit relative Pfade stimmen. Ein Verweis auf
+                    // einen Modellordner an anderer Stelle zaehlt genauso.
+                    const path = try std.fs.path.join(mem, &.{ self.dir, entry.name, descriptor_file });
+                    const stat = std.Io.Dir.cwd().statFile(io, path, .{}) catch continue;
+                    if (stat.kind != .file) continue;
+                    try files.append(mem, path);
+                },
+                else => {},
+            }
         }
 
         std.mem.sort([]const u8, files.items, {}, lessThanPath);
@@ -418,10 +464,7 @@ const Scan = struct {
     default_id: ?[]const u8,
 
     fn deinit(self: *Scan, gpa: std.mem.Allocator) void {
-        for (self.entries.items) |*entry| {
-            entry.descriptor.deinit();
-            gpa.free(entry.path);
-        }
+        for (self.entries.items) |*entry| entry.deinit(gpa);
         self.entries.deinit(gpa);
         self.order.deinit(gpa);
         if (self.default_id) |id| gpa.free(id);
@@ -547,7 +590,7 @@ test "Registry meldet unbekanntes Modell in der Modelliste" {
     );
 }
 
-test "Registry meldet ein Modell mit doppelter Kennung" {
+test "Registry ueberspringt ein Modell mit doppelter Kennung" {
     const io = testing.io;
     var tmp = testing.tmpDir(.{});
     defer tmp.cleanup();
@@ -558,10 +601,38 @@ test "Registry meldet ein Modell mit doppelter Kennung" {
     const dir_path = try tmpPath(testing.allocator, &tmp);
     defer testing.allocator.free(dir_path);
 
-    try testing.expectError(
-        error.DuplicateModel,
-        Registry.load(testing.allocator, io, dir_path),
-    );
+    // Die erste Datei gewinnt. Die zweite wird gemeldet und uebersprungen.
+    var registry = try Registry.load(testing.allocator, io, dir_path);
+    defer registry.deinit();
+
+    try testing.expectEqual(@as(usize, 1), registry.entries.items.len);
+    try testing.expectEqualStrings("a", registry.entries.items[0].id);
+    try testing.expectEqualStrings("a", registry.default_id.?);
+}
+
+test "Registry ueberspringt einen defekten Deskriptor" {
+    const io = testing.io;
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+
+    try writeFile(tmp.dir, io, "a.json", model_a);
+    // Kein gueltiges JSON.
+    try writeFile(tmp.dir, io, "kaputt.json", "{\"name\": \"Kaputt\"");
+    // Gueltiges JSON, aber ohne die Pflichtfelder.
+    try writeFile(tmp.dir, io, "leer.json", "{\"version\": \"1.0\"}");
+
+    const dir_path = try tmpPath(testing.allocator, &tmp);
+    defer testing.allocator.free(dir_path);
+
+    // Ein defekter Deskriptor darf die Registry nicht zerstoeren. Das gute
+    // Modell bleibt vorhanden und benutzbar.
+    var registry = try Registry.load(testing.allocator, io, dir_path);
+    defer registry.deinit();
+
+    try testing.expectEqual(@as(usize, 1), registry.entries.items.len);
+    try testing.expectEqualStrings("a", registry.entries.items[0].id);
+    try testing.expectEqualStrings("a", registry.default_id.?);
+    try testing.expectEqualStrings("a", registry.active_id.?);
 }
 
 test "Neuladen meldet geaenderte, neue und entfallene Modelle" {
@@ -634,6 +705,78 @@ test "Neuladen ohne Aenderung meldet nichts" {
 
     try testing.expect(changes.isEmpty());
     try testing.expectEqual(@as(usize, 1), registry.entries.items.len);
+}
+
+test "Neuladen haelt die Kennungen der Modelle intakt" {
+    const io = testing.io;
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+
+    try writeFile(tmp.dir, io, "a.json", model_a);
+    try writeFile(tmp.dir, io, "b.json", model_b);
+
+    const dir_path = try tmpPath(testing.allocator, &tmp);
+    defer testing.allocator.free(dir_path);
+
+    var registry = try Registry.load(testing.allocator, io, dir_path);
+    defer registry.deinit();
+
+    // Nach jedem Neuladen muessen die Kennungen dieselben Bytes haben. Ein
+    // freigegebener Deskriptor darf die Kennung nicht beschaedigen.
+    for (0..3) |round| {
+        var changes = try registry.reload(io);
+        defer changes.deinit();
+
+        try testing.expect(changes.isEmpty());
+        try testing.expectEqual(@as(usize, 2), registry.entries.items.len);
+        try testing.expectEqualStrings("a", registry.entries.items[0].id);
+        try testing.expectEqualStrings("b", registry.entries.items[1].id);
+        try testing.expectEqualStrings("a", registry.default_id.?);
+        try testing.expectEqualStrings("a", registry.active_id.?);
+
+        const ids = try registry.ids(testing.allocator);
+        defer {
+            for (ids) |id| testing.allocator.free(id);
+            testing.allocator.free(ids);
+        }
+        try testing.expectEqualStrings("a", ids[0]);
+        try testing.expectEqualStrings("b", ids[1]);
+
+        try testing.expectEqual(@as(u8, 'a'), ids[0][0]);
+        try testing.expectEqual(@as(u8, 'b'), ids[1][0]);
+        _ = round;
+    }
+}
+
+test "Neuladen mit geaendertem Deskriptor haelt die Kennung intakt" {
+    const io = testing.io;
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+
+    try writeFile(tmp.dir, io, "a.json", model_a);
+
+    const dir_path = try tmpPath(testing.allocator, &tmp);
+    defer testing.allocator.free(dir_path);
+
+    var registry = try Registry.load(testing.allocator, io, dir_path);
+    defer registry.deinit();
+
+    try writeFile(tmp.dir, io, "a.json",
+        \\{
+        \\  "name": "Modell A neu",
+        \\  "model": "a",
+        \\  "model_file": "a.onnx",
+        \\  "voices": "a.npz"
+        \\}
+    );
+
+    var changes = try registry.reload(io);
+    defer changes.deinit();
+
+    try testing.expectEqual(@as(usize, 1), changes.changed.len);
+    try testing.expectEqualStrings("a", changes.changed[0]);
+    try testing.expectEqualStrings("a", registry.entries.items[0].id);
+    try testing.expectEqualStrings("Modell A neu", registry.entries.items[0].descriptor.name);
 }
 
 test "Registry meldet ein fehlendes Verzeichnis" {

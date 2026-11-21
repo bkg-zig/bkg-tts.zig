@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, type SystemInfo } from './api'
-import { loadMagpieWasm } from './wasm'
+import { loadTtsWasm } from './wasm'
 import { Dashboard } from './pages/Dashboard'
 import { Playground } from './pages/Playground'
 import { RealtimeLab } from './pages/RealtimeLab'
@@ -32,18 +32,17 @@ const NAV = [
 export default function App() {
   const [page, setPage] = useState('dashboard')
   const [sys, setSys] = useState<SystemInfo | null>(null)
-  const [ws, setWs] = useState(false)
+  const [online, setOnline] = useState(false)
   const [wasmState, setWasmState] = useState<'loading' | 'ready' | 'error'>('loading')
 
   useEffect(() => {
-    loadMagpieWasm().then(() => setWasmState('ready')).catch(() => setWasmState('error'))
+    loadTtsWasm().then(() => setWasmState('ready')).catch(() => setWasmState('error'))
     const poll = async () => {
       try {
-        const s = await api<SystemInfo>('/api/system')
-        setSys(s)
-        setWs(true)
+        setSys(await api<SystemInfo>('/api/system'))
+        setOnline(true)
       } catch {
-        setWs(false)
+        setOnline(false)
       }
     }
     poll()
@@ -51,16 +50,16 @@ export default function App() {
     return () => clearInterval(id)
   }, [])
 
-  const ready = sys?.model?.state === 'active'
+  const ready = sys?.model?.loaded === true
 
   return (
     <div className="flex h-screen">
       <aside className="w-56 border-r border-zinc-800 bg-zinc-950 flex flex-col shrink-0">
         <div className="px-4 py-4 border-b border-zinc-800">
-          <div className="font-bold text-lg tracking-tight">Magpie TTS</div>
+          <div className="font-bold text-lg tracking-tight">BKG TTS</div>
           <div className="mt-1 flex items-center gap-1.5">
             <span className={`h-2 w-2 rounded-full ${ready ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`} />
-            <span className="text-xs text-zinc-500">{ready ? 'Ready' : ws ? 'Loading model' : 'Offline'}</span>
+            <span className="text-xs text-zinc-500">{ready ? 'Ready' : online ? 'No model loaded' : 'Offline'}</span>
           </div>
         </div>
         <nav className="flex-1 overflow-y-auto py-2">
@@ -87,12 +86,10 @@ export default function App() {
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-12 border-b border-zinc-800 flex items-center px-4 gap-6 text-xs text-zinc-400">
-          <span className="font-medium text-zinc-300">MODEL: {sys?.model?.revision || '—'}</span>
+          <span className="font-medium text-zinc-300">MODEL: {sys?.model?.model_id || '—'}</span>
+          <span>STATE: {sys?.model?.state || '—'}</span>
+          <span>DEVICE: {sys?.model?.device || '—'}</span>
           <span>WASM: {wasmState === 'ready' ? 'READY' : wasmState === 'loading' ? 'LOADING' : 'ERROR'}</span>
-          <span>PROFILE: {(sys?.model?.profile || '—').toUpperCase()}</span>
-          <span>DEVICE: {sys?.model?.device || 'cpu'}</span>
-          <span>VRAM: not applicable (CPU)</span>
-          <span>SESSIONS: {sys?.runtime?.active_sessions ? 1 : 0}</span>
           <span className="ml-auto">v{sys?.server?.version || '—'}</span>
         </header>
         <main className="flex-1 overflow-y-auto p-6">

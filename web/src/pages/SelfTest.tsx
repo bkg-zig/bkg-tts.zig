@@ -1,43 +1,22 @@
 import { useState } from 'react'
-import { api } from '../api'
+import { runSelftest, type SelfTestResult } from '../api'
 import { Card, Badge, Spinner } from '../components/ui'
 
 const TEST_NAMES: Record<string, string> = {
-  test_health: 'Health',
-  test_ready: 'Ready state',
-  test_model_list: 'Model list',
-  test_voice_list: 'Voice list',
-  test_en_generation: 'English generation',
-  test_hi_generation: 'Hindi generation',
-  test_hinglish: 'Hinglish',
-  test_wav: 'WAV',
-  test_pcm: 'PCM',
-  test_mp3: 'MP3',
-  test_opus: 'OPUS',
-  test_http_stream: 'HTTP streaming',
-  test_ws_stream: 'WebSocket streaming',
-  test_cancellation: 'Cancellation',
-  test_profile_switch: 'Profile switching',
-  test_model_reload: 'Model reload',
-  test_invalid_language: 'Invalid language',
-  test_invalid_voice: 'Invalid voice',
-  test_empty_text: 'Empty text',
-  test_oversized_input: 'Oversized input',
-  test_concurrent: 'Concurrent requests',
-  test_queue_overload: 'Queue overload',
-  test_gpu_metrics: 'GPU metrics',
-  test_openai_compat: 'OpenAI compatibility',
+  test_native_generation: 'Native generation',
 }
 
 export function SelfTest() {
-  const [result, setResult] = useState<any>(null)
+  const [result, setResult] = useState<SelfTestResult | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const run = async () => {
-    setBusy(true); setError(null); setResult(null)
+    setBusy(true)
+    setError(null)
+    setResult(null)
     try {
-      setResult(await api('/api/selftest', { method: 'POST' }))
+      setResult(await runSelftest())
     } catch (e: any) {
       setError(e.message)
     }
@@ -46,37 +25,61 @@ export function SelfTest() {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <h1 className="text-2xl font-bold">Full Self Test</h1>
+      <h1 className="text-2xl font-bold">Self test</h1>
       <p className="text-sm text-zinc-400">
-        Führt eine echte native CPU-Synthese aus und prüft Sample-Anzahl, Dauer und Nicht-Stille. Nicht portierte Legacy-Checks werden nicht als bestanden dargestellt.
+        The server runs one real synthesis with the text of the active model and measures the result.
       </p>
       <button className="btn-primary" onClick={run} disabled={busy}>
-        {busy ? 'Running…' : 'RUN NATIVE AUDIO SELF TEST'}
+        {busy ? 'Running…' : 'Run self test'}
       </button>
-      {busy && <Spinner label="Echte Magpie-Synthese läuft" />}
+      {busy && <Spinner label="synthesizing" />}
       {error && <div className="text-sm text-red-400">{error}</div>}
       {result && (
-        <Card title="Results">
-          <div className="mb-4 text-lg font-semibold">
-            {result.passed} / {result.total} PASSED
-            {result.failed > 0 && <span className="text-red-400 ml-2">({result.failed} FAILED)</span>}
-          </div>
-          <table className="w-full text-sm">
-            <tbody>
-              {result.results.map((r: any) => (
-                <tr key={r.name} className="border-t border-zinc-800">
-                  <td className="py-1.5">{TEST_NAMES[r.name] || r.name}</td>
-                  <td className="py-1.5">
-                    {r.passed ? <Badge color="green">PASSED</Badge> : <Badge color="red">FAILED</Badge>}
-                  </td>
-                  <td className="py-1.5 text-xs text-zinc-500 max-w-md truncate" title={r.message}>{r.message}</td>
-                  <td className="py-1.5 text-xs text-zinc-600 mono">{r.duration_ms.toFixed(0)} ms</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+        <>
+          <Card title="Results">
+            <div className="mb-4 text-lg font-semibold">
+              {result.passed} / {result.total} passed
+              {result.failed > 0 && <span className="text-red-400 ml-2">{result.failed} failed</span>}
+            </div>
+            <table className="w-full text-sm">
+              <tbody>
+                {result.results.map((entry) => (
+                  <tr key={entry.name} className="border-t border-zinc-800">
+                    <td className="py-1.5">{TEST_NAMES[entry.name] ?? entry.name}</td>
+                    <td className="py-1.5">
+                      {entry.passed ? <Badge color="green">passed</Badge> : <Badge color="red">failed</Badge>}
+                    </td>
+                    <td className="py-1.5 text-xs text-zinc-500 max-w-md truncate" title={entry.message}>{entry.message}</td>
+                    <td className="py-1.5 text-xs text-zinc-600 mono">{entry.duration_ms.toFixed(0)} ms</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+          <Card title="Measurement">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <Metric label="Engine" value={result.engine} />
+              <Metric label="Device" value={result.device} />
+              <Metric label="Sample rate" value={`${result.sample_rate} Hz`} />
+              <Metric label="Samples" value={result.samples} />
+              <Metric label="Duration" value={`${result.duration_s.toFixed(3)} s`} />
+              <Metric label="Nonzero samples" value={result.nonzero_samples} />
+              <Metric label="Peak" value={result.peak.toFixed(5)} />
+              <Metric label="RMS" value={result.rms.toFixed(5)} />
+              <Metric label="Generation" value={`${result.generation_ms.toFixed(0)} ms`} />
+            </div>
+          </Card>
+        </>
       )}
+    </div>
+  )
+}
+
+function Metric({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-3">
+      <div className="text-xs uppercase tracking-wide text-zinc-500">{label}</div>
+      <div className="mt-1 text-lg font-semibold mono">{value}</div>
     </div>
   )
 }

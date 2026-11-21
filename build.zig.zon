@@ -1,6 +1,6 @@
 .{
-    .name = .bkg_magpietts,
-    .fingerprint = 0xb4c84866af132e82,
+    .name = .bkg_tts,
+    .fingerprint = 0x8aad957af8963777,
     .version = "0.1.0",
     .minimum_zig_version = "0.16.0",
     .paths = .{

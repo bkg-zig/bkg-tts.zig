@@ -302,6 +302,12 @@ pub const TokenOptions = struct {
     suffix: []const i64 = &.{},
     /// Verhalten bei Zeichen, die nicht im Vorrat stehen.
     unknown: UnknownPolicy = .drop,
+    /// Fehlende Phoneme werden gemeldet.
+    ///
+    /// Die Piper-Referenz warnt bei jedem fehlenden Phonem und ueberspringt
+    /// es. Die Meldung enthaelt das Phonem, damit die Luecke in der Map
+    /// sichtbar bleibt.
+    report_missing: bool = false,
     /// Der Text wird vor der Zuordnung in Normalisierungsform D zerlegt.
     normalize_nfd: bool = false,
     /// Leerzeichen am Anfang und Ende des Textes werden entfernt.
@@ -481,6 +487,9 @@ pub fn buildPhonemeIdSequence(
 
         const phoneme_ids = map.lookup(key) orelse {
             if (options.unknown == .@"error") return error.UnknownPhoneme;
+            if (options.report_missing) {
+                std.log.warn("Phonem {s} fehlt in der ID-Map und wird uebersprungen", .{key});
+            }
             continue;
         };
         try ids.appendSlice(gpa, phoneme_ids);

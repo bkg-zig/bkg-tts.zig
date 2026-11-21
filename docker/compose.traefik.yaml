@@ -1,9 +1,9 @@
 services:
-  bkg-magpietts-zig:
+  bkg-tts:
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=bkg_net"
-      - "traefik.http.routers.bkg-magpietts-zig.rule=Host(`${MAGPIE_TRAEFIK_HOST:?set MAGPIE_TRAEFIK_HOST}`)"
-      - "traefik.http.routers.bkg-magpietts-zig.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}"
-      - "traefik.http.routers.bkg-magpietts-zig.tls=true"
-      - "traefik.http.services.bkg-magpietts-zig.loadbalancer.server.port=8092"
+      - "traefik.docker.network=${TRAEFIK_NETWORK:-bkg-tts}"
+      - "traefik.http.routers.bkg-tts.rule=Host(`${BKG_TTS_TRAEFIK_HOST:?set BKG_TTS_TRAEFIK_HOST}`)"
+      - "traefik.http.routers.bkg-tts.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}"
+      - "traefik.http.routers.bkg-tts.tls=true"
+      - "traefik.http.services.bkg-tts.loadbalancer.server.port=8092"

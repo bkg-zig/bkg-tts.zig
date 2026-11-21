@@ -1,7 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import WaveSurfer from 'wavesurfer.js'
 
-export function AudioPlayer({ src, name, onEnded }: { src: string; name?: string; onEnded?: () => void }) {
+export function AudioPlayer({
+  src,
+  downloadSrc,
+  name,
+  onEnded,
+}: {
+  src: string
+  downloadSrc?: string
+  name?: string
+  onEnded?: () => void
+}) {
   const containerRef = useRef<HTMLDivElement>(null)
   const wsRef = useRef<WaveSurfer | null>(null)
   const [playing, setPlaying] = useState(false)
@@ -39,7 +49,7 @@ export function AudioPlayer({ src, name, onEnded }: { src: string; name?: string
       </button>
       <div ref={containerRef} className="flex-1 min-w-0" />
       {name && (
-        <a href={src} download={name} className="btn h-9 flex items-center px-2" title="Download">
+        <a href={downloadSrc ?? src} download={name} className="btn h-9 flex items-center px-2" title="Download">
           ⬇
         </a>
       )}
