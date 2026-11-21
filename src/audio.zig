@@ -6,15 +6,23 @@ const std = @import("std");
 
 pub const wav_header_bytes = 44;
 
+/// Quantisiert ein Float-Sample auf 16-Bit.
+///
+/// Der Weg entspricht der Referenz: Vielfaches mit 32767, Grenze auf
+/// [-32768, 32767], dann Abschneiden Richtung null.
+pub fn quantize(sample: f32) i16 {
+    const scaled = sample * 32767.0;
+    const clamped = @max(-32768.0, @min(32767.0, scaled));
+    return @intFromFloat(clamped);
+}
+
 /// Quantisiert Float-Samples auf 16-Bit und legt sie little-endian ab.
 pub fn encodePcm16(gpa: std.mem.Allocator, samples: []const f32) ![]u8 {
     const byte_len = std.math.mul(usize, samples.len, 2) catch return error.AudioTooLarge;
     const bytes = try gpa.alloc(u8, byte_len);
     errdefer gpa.free(bytes);
     for (samples, 0..) |sample, index| {
-        const clamped = @max(-1.0, @min(1.0, sample));
-        const value: i16 = @intFromFloat(@round(clamped * 32767.0));
-        std.mem.writeInt(i16, bytes[index * 2 ..][0..2], value, .little);
+        std.mem.writeInt(i16, bytes[index * 2 ..][0..2], quantize(sample), .little);
     }
     return bytes;
 }
@@ -60,8 +68,9 @@ test "wav header describes mono pcm16" {
     try std.testing.expectEqual(@as(u32, 24000), std.mem.readInt(u32, wav[24..28], .little));
     try std.testing.expectEqual(@as(u16, 1), std.mem.readInt(u16, wav[22..24], .little));
     try std.testing.expectEqual(@as(u32, 6), std.mem.readInt(u32, wav[40..44], .little));
-    try std.testing.expectEqual(@as(u32, 50), std.mem.readInt(u32, wav[4..8], .little));
-    try std.testing.expectEqual(@as(i16, 16384), std.mem.readInt(i16, wav[46..48], .little));
+    // Das RIFF-Feld zaehlt die Bytes der Datei ohne die ersten acht.
+    try std.testing.expectEqual(@as(u32, 42), std.mem.readInt(u32, wav[4..8], .little));
+    try std.testing.expectEqual(@as(i16, 16383), std.mem.readInt(i16, wav[46..48], .little));
 }
 
 test "pcm16 clamps out-of-range samples" {
@@ -69,6 +78,14 @@ test "pcm16 clamps out-of-range samples" {
     const samples = [_]f32{ -2.0, 2.0 };
     const pcm = try encodePcm16(gpa, &samples);
     defer gpa.free(pcm);
-    try std.testing.expectEqual(@as(i16, -32767), std.mem.readInt(i16, pcm[0..2], .little));
+    try std.testing.expectEqual(@as(i16, -32768), std.mem.readInt(i16, pcm[0..2], .little));
     try std.testing.expectEqual(@as(i16, 32767), std.mem.readInt(i16, pcm[2..4], .little));
+}
+
+test "quantize schneidet Richtung null ab" {
+    try std.testing.expectEqual(@as(i16, 16383), quantize(0.5));
+    try std.testing.expectEqual(@as(i16, -16383), quantize(-0.5));
+    try std.testing.expectEqual(@as(i16, 0), quantize(0.0));
+    try std.testing.expectEqual(@as(i16, 32767), quantize(2.0));
+    try std.testing.expectEqual(@as(i16, -32768), quantize(-2.0));
 }

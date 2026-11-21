@@ -1,5 +1,6 @@
-//! BKG TTS — native Zig HTTP/Realtime server.
+//! BKG TTS — native Zig HTTP/Realtime server und Kommandozeile.
 const std = @import("std");
+const cli = @import("cli.zig");
 const config_mod = @import("config.zig");
 const engine_mod = @import("engine.zig");
 const pronunciation_mod = @import("pronunciation.zig");
@@ -16,25 +17,78 @@ test {
     _ = router;
     _ = api;
     _ = realtime;
+    _ = cli;
     _ = config_mod;
     _ = engine_mod;
     _ = pronunciation_mod;
     _ = web_request;
 }
 
+/// Startet die Kommandozeile.
+///
+/// Ohne Befehl startet der HTTP-Server. Die Befehle `synth`, `info` und
+/// `fetch` arbeiten mit einem Modellordner bzw. einem Repository und
+/// brauchen keinen laufenden Server.
 pub fn main(init: std.process.Init.Minimal) !void {
     const gpa = std.heap.smp_allocator;
-    var threaded = std.Io.Threaded.init(gpa, .{});
+    // Die Umgebung wird durchgereicht, damit die Suche nach Programmen wie
+    // curl den PATH der aufrufenden Shell benutzt.
+    var threaded = std.Io.Threaded.init(gpa, .{ .environ = init.environ });
     const io = threaded.io();
 
+    var args = std.ArrayList([]const u8).empty;
+    defer args.deinit(gpa);
+
+    var iterator = init.args.iterate();
+    _ = iterator.skip();
+    while (iterator.next()) |arg| {
+        try args.append(gpa, arg);
+    }
+
+    const options = cli.parse(args.items) catch |err| {
+        std.log.err("Die Kommandozeile liess sich nicht lesen: {s}", .{@errorName(err)});
+        cli.printHelp(io) catch {};
+        std.process.exit(2);
+    };
+
+    switch (options.command) {
+        .serve => serve(init, gpa, io) catch |err| {
+            std.log.err("Der Server endete mit einem Fehler: {s}", .{@errorName(err)});
+            std.process.exit(1);
+        },
+        .synth => cli.synth(gpa, io, init.environ, options) catch |err| {
+            std.log.err("Die Synthese ist fehlgeschlagen: {s}", .{@errorName(err)});
+            std.process.exit(1);
+        },
+        .info => cli.info(gpa, io, init.environ, options) catch |err| {
+            std.log.err("Die Modellinformation liess sich nicht lesen: {s}", .{@errorName(err)});
+            std.process.exit(1);
+        },
+        .fetch => cli.fetch(gpa, io, init.environ, options) catch |err| {
+            std.log.err("Der Download ist fehlgeschlagen: {s}", .{@errorName(err)});
+            std.process.exit(1);
+        },
+        .help => cli.printHelp(io) catch |err| {
+            std.log.err("Die Hilfe liess sich nicht schreiben: {s}", .{@errorName(err)});
+            std.process.exit(1);
+        },
+    }
+}
+
+/// Startet den HTTP-Server.
+fn serve(init: std.process.Init.Minimal, gpa: std.mem.Allocator, io: std.Io) !void {
     const cfg = config_mod.fromEnviron(init.environ);
-    const model_path = cfg.model_path orelse "";
+    const models_dir = try cfg.modelsDir(gpa);
+    defer gpa.free(models_dir);
+
     var engine = engine_mod.Engine.init(gpa, io, .{
-        .gpa = gpa,
-        .lib_path = cfg.lib_path,
-        .model_path = model_path,
-        .language = "en",
-        .speaker = "Aria",
+        .models_dir = models_dir,
+        .ort_library = cfg.ort_library,
+        .espeak_library = cfg.espeak_library,
+        .espeak_data = cfg.espeak_data,
+        .model = cfg.model,
+        .language = cfg.language,
+        .voice = cfg.voice,
     });
     defer engine.deinit();
 
@@ -55,14 +109,11 @@ pub fn main(init: std.process.Init.Minimal) !void {
         try std.Io.net.IpAddress.resolve(io, cfg.host, cfg.port);
     var server = try address.listen(io, .{ .reuse_address = true });
     defer server.deinit(io);
-    std.debug.print("bkg-tts listening on {s}:{d} (CPU-only, native Zig)\n", .{ cfg.host, cfg.port });
+    std.debug.print("bkg-tts lauscht auf {s}:{d} (nur CPU, eigenes Zig-Backend)\n", .{ cfg.host, cfg.port });
 
-    if (cfg.model_path) |path| {
-        std.debug.print("Magpie model configured: {s}\n", .{path});
+    {
         const loader = try std.Thread.spawn(.{}, loadModel, .{&engine});
         loader.detach();
-    } else {
-        std.debug.print("No model configured; liveness is available, readiness returns 503. Set BKG_MAGPIE_MODEL.\n", .{});
     }
 
     while (true) {
@@ -79,12 +130,15 @@ pub fn main(init: std.process.Init.Minimal) !void {
 }
 
 fn loadModel(engine: *engine_mod.Engine) void {
-    engine.load();
+    engine.load() catch {
+        std.debug.print("Modell nicht verfuegbar: {s}\n", .{engine.lastError() orelse "unbekannter Fehler"});
+        return;
+    };
     if (!engine.isActive()) {
-        std.debug.print("Magpie model unavailable: {s}\n", .{engine.last_error orelse "unknown error"});
-    } else {
-        std.debug.print("Magpie model loaded; ready endpoint returns 200.\n", .{});
+        std.debug.print("Modell nicht verfuegbar: {s}\n", .{engine.lastError() orelse "unbekannter Fehler"});
+        return;
     }
+    std.debug.print("Modell {s} geladen; der Ready-Endpunkt antwortet mit 200.\n", .{engine.activeModelId() orelse "unbekannt"});
 }
 
 fn serveConnection(ctx: *api.Context, io: std.Io, stream: std.Io.net.Stream) void {
@@ -147,12 +201,27 @@ fn handleConnection(ctx: *api.Context, io: std.Io, stream: std.Io.net.Stream) !v
     defer body.deinit(ctx.gpa);
 
     if (method.requestHasBody()) {
+        // Die Laenge des Bodies muss bekannt sein, bevor gelesen wird. Ohne
+        // Content-Length und ohne Chunked-Transfer wartet der Reader sonst
+        // bis zum Ende der Verbindung, und die Antwort kommt nicht.
+        const body_length_known = request.head.content_length != null or
+            request.head.transfer_encoding == .chunked;
+
         var body_buffer: [4096]u8 = undefined;
-        const body_reader = request.readerExpectNone(&body_buffer);
-        body_reader.appendRemaining(ctx.gpa, &body, .limited(max_request_body)) catch {
-            try sendRawError(&request, .payload_too_large, "application/json; charset=utf-8", "{\"error\":{\"code\":\"BODY_TOO_LARGE\",\"message\":\"Der Request-Body ist zu groß.\"}}");
-            return;
+        const body_reader = request.readerExpectContinue(&body_buffer) catch |err| switch (err) {
+            error.HttpExpectationFailed => {
+                try sendRawError(&request, .expectation_failed, "application/json; charset=utf-8", "{\"error\":{\"code\":\"EXPECTATION_FAILED\",\"message\":\"Der Expect-Header wird nicht unterstützt.\"}}");
+                return;
+            },
+            error.WriteFailed => return err,
         };
+
+        if (body_length_known) {
+            body_reader.appendRemaining(ctx.gpa, &body, .limited(max_request_body)) catch {
+                try sendRawError(&request, .payload_too_large, "application/json; charset=utf-8", "{\"error\":{\"code\":\"BODY_TOO_LARGE\",\"message\":\"Der Request-Body ist zu groß.\"}}");
+                return;
+            };
+        }
     }
 
     var response = api.handle(ctx, .{

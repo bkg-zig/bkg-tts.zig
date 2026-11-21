@@ -1,39 +1,86 @@
 //! Browser-side validation primitives consumed by the React client.
 //! No operating-system, libc, network, or native TTS imports are allowed here.
+//!
+//! The module carries only the limits that are fixed by the server contract.
+//! Voices, languages, models and their sample rates come from the HTTP API,
+//! because they depend on the loaded model.
 
 const std = @import("std");
+const limits = @import("limits.zig");
 
-/// Returns a speaker slot for the stable Magpie voice order; 255 means invalid.
-export fn bkg_magpie_voice_index(voice: u32) u32 {
-    return if (voice < 5) voice else 255;
+/// Version of the browser contract. The client refuses older or newer values.
+pub const contract_version: u32 = 1;
+
+/// Highest number of characters the HTTP endpoints accept.
+pub const max_text_chars: u32 = @intCast(limits.max_text_chars);
+
+/// Lowest tempo the HTTP endpoints accept.
+pub const min_speed: f32 = limits.min_speed;
+
+/// Highest tempo the HTTP endpoints accept.
+pub const max_speed: f32 = limits.max_speed;
+
+/// Lowest tempo a realtime session accepts.
+pub const realtime_min_speed: f32 = limits.realtime_min_speed;
+
+/// Highest tempo a realtime session accepts.
+pub const realtime_max_speed: f32 = limits.realtime_max_speed;
+
+/// Returns the contract version that the UI compares before calling APIs.
+export fn bkg_tts_contract_version() u32 {
+    return contract_version;
 }
 
-/// Returns true only for a sample rate supported by the server contract.
-export fn bkg_magpie_sample_rate_allowed(rate: u32) bool {
-    return switch (rate) {
-        8000, 16000, 22050, 24000, 48000 => true,
-        else => false,
-    };
+/// Returns the character limit of the HTTP endpoints.
+export fn bkg_tts_max_text_chars() u32 {
+    return max_text_chars;
 }
 
-/// Max character count accepted by the current service contract.
-export fn bkg_magpie_max_text_chars() u32 {
-    return 5000;
+/// Returns the lowest tempo of the HTTP endpoints.
+export fn bkg_tts_min_speed() f32 {
+    return min_speed;
 }
 
-/// Returns a stable contract version that the UI can compare before calling APIs.
-export fn bkg_magpie_contract_version() u32 {
-    return 1;
+/// Returns the highest tempo of the HTTP endpoints.
+export fn bkg_tts_max_speed() f32 {
+    return max_speed;
 }
 
-test "supported sample rates match the HTTP contract" {
-    try std.testing.expect(bkg_magpie_sample_rate_allowed(22050));
-    try std.testing.expect(bkg_magpie_sample_rate_allowed(48000));
-    try std.testing.expect(!bkg_magpie_sample_rate_allowed(44100));
+/// Returns the lowest tempo of a realtime session.
+export fn bkg_tts_realtime_min_speed() f32 {
+    return realtime_min_speed;
 }
 
-test "speaker index rejects unknown voices" {
-    try std.testing.expectEqual(@as(u32, 0), bkg_magpie_voice_index(0));
-    try std.testing.expectEqual(@as(u32, 4), bkg_magpie_voice_index(4));
-    try std.testing.expectEqual(@as(u32, 255), bkg_magpie_voice_index(5));
+/// Returns the highest tempo of a realtime session.
+export fn bkg_tts_realtime_max_speed() f32 {
+    return realtime_max_speed;
+}
+
+/// Returns true when the tempo lies in the range of the HTTP endpoints.
+export fn bkg_tts_speed_allowed(speed: f32) bool {
+    return limits.speedAllowed(speed);
+}
+
+/// Returns true when the tempo lies in the range of a realtime session.
+export fn bkg_tts_realtime_speed_allowed(speed: f32) bool {
+    return limits.realtimeSpeedAllowed(speed);
+}
+
+test "the tempo limits match the HTTP contract" {
+    try std.testing.expect(bkg_tts_speed_allowed(0.25));
+    try std.testing.expect(bkg_tts_speed_allowed(4.0));
+    try std.testing.expect(!bkg_tts_speed_allowed(0.24));
+    try std.testing.expect(!bkg_tts_speed_allowed(4.01));
+}
+
+test "the tempo limits match the realtime contract" {
+    try std.testing.expect(bkg_tts_realtime_speed_allowed(0.5));
+    try std.testing.expect(bkg_tts_realtime_speed_allowed(2.0));
+    try std.testing.expect(!bkg_tts_realtime_speed_allowed(0.49));
+    try std.testing.expect(!bkg_tts_realtime_speed_allowed(2.01));
+}
+
+test "the character limit stays at the value of the HTTP contract" {
+    try std.testing.expectEqual(@as(u32, 5000), bkg_tts_max_text_chars());
+    try std.testing.expectEqual(@as(u32, 1), bkg_tts_contract_version());
 }

@@ -1,27 +1,63 @@
-//! Realtime WebSocket event loop. Emits audio only from real Magpie inference.
+//! Realtime WebSocket event loop. The audio comes from the active model of
+//! the engine. Voices, languages and the sample rate are read from the
+//! engine, never from a fixed list.
 const std = @import("std");
 const api_mod = @import("api.zig");
+const audio_mod = @import("audio.zig");
+const limits = @import("limits.zig");
 
-const max_text_bytes = 5000;
 const chunk_ms = 200;
 
+/// The state of one realtime session.
+///
+/// The names of the voice and the language belong to the session. They are
+/// copied from the engine, because the engine can swap its model while the
+/// session lives.
 const Session = struct {
     id: u64,
-    voice: []const u8 = "Aria",
-    language: []const u8 = "en",
+    /// Name of the voice. Empty means: the first voice of the model.
+    voice: []u8,
+    /// Language of the session. Empty means: the language of the model.
+    language: []u8,
     format: []const u8 = "pcm",
-    sample_rate: u32 = 22050,
+    sample_rate: u32 = 0,
+    speed: f32 = 1.0,
+
+    fn deinit(self: *Session, gpa: std.mem.Allocator) void {
+        gpa.free(self.voice);
+        gpa.free(self.language);
+        self.* = undefined;
+    }
+
+    /// Replaces the voice of the session.
+    fn setVoice(self: *Session, gpa: std.mem.Allocator, value: []const u8) !void {
+        const owned = try gpa.dupe(u8, value);
+        gpa.free(self.voice);
+        self.voice = owned;
+    }
+
+    /// Replaces the language of the session.
+    fn setLanguage(self: *Session, gpa: std.mem.Allocator, value: []const u8) !void {
+        const owned = try gpa.dupe(u8, value);
+        gpa.free(self.language);
+        self.language = owned;
+    }
 };
 
 pub fn serve(ws: *std.http.Server.WebSocket, ctx: *api_mod.Context) !void {
     const session_id = ctx.nextRequestId();
-    var session = Session{ .id = session_id };
+    var session = Session{
+        .id = session_id,
+        .voice = try ctx.gpa.dupe(u8, ""),
+        .language = try ctx.gpa.dupe(u8, ""),
+    };
+    defer session.deinit(ctx.gpa);
+    try applyModelDefaults(ctx, &session);
+
     var pending = std.ArrayList(u8).empty;
     defer pending.deinit(ctx.gpa);
 
-    try sendFmt(ws, ctx.gpa,
-        "{{\"type\":\"session.created\",\"session_id\":\"sess_{x}\",\"request_id\":\"req_{x}\"}}",
-        .{ session.id, session.id });
+    try sendFmt(ws, ctx.gpa, "{{\"type\":\"session.created\",\"session_id\":\"sess_{x}\",\"request_id\":\"req_{x}\",\"voice\":\"{s}\",\"language\":\"{s}\",\"format\":\"{s}\",\"sample_rate\":{d}}}", .{ session.id, session.id, session.voice, session.language, session.format, session.sample_rate });
 
     while (true) {
         const message = ws.readSmallMessage() catch return;
@@ -43,22 +79,20 @@ pub fn serve(ws: *std.http.Server.WebSocket, ctx: *api_mod.Context) !void {
         const event = parsed.value;
         const event_type = stringField(event, "type", "");
         if (std.mem.eql(u8, event_type, "session.update")) {
-            if (applySession(&session, field(event, "session"))) |err_code| {
-                try sendError(ws, ctx.gpa, session.id, err_code, "Die Session-Konfiguration enthält eine nicht unterstützte Option.");
+            if (applySession(ctx, &session, field(event, "session"))) |err_code| {
+                try sendError(ws, ctx.gpa, session.id, err_code, errorText(err_code));
                 continue;
             }
-            try sendFmt(ws, ctx.gpa,
-                "{{\"type\":\"session.updated\",\"session_id\":\"sess_{x}\",\"session\":{{\"voice\":\"{s}\",\"language\":\"{s}\",\"format\":\"{s}\",\"sample_rate\":{d},\"speed\":1.0,\"text_normalization\":false,\"cfg_enabled\":true,\"cfg_scale\":2.5}}}}",
-                .{ session.id, session.voice, session.language, session.format, session.sample_rate });
+            try sendFmt(ws, ctx.gpa, "{{\"type\":\"session.updated\",\"session_id\":\"sess_{x}\",\"session\":{{\"voice\":\"{s}\",\"language\":\"{s}\",\"format\":\"{s}\",\"sample_rate\":{d},\"speed\":{d:.2},\"text_normalization\":false,\"cfg_enabled\":false}}}}", .{ session.id, session.voice, session.language, session.format, session.sample_rate, session.speed });
         } else if (std.mem.eql(u8, event_type, "input_text.append")) {
             const fragment = stringField(event, "text", "");
             if (fragment.len == 0) {
                 try sendError(ws, ctx.gpa, session.id, "INVALID_REQUEST", "Leere Textfragmente sind nicht zulässig.");
                 continue;
             }
-            if (pending.items.len + fragment.len > max_text_bytes) {
+            if (pending.items.len + fragment.len > limits.max_text_chars) {
                 pending.clearRetainingCapacity();
-                try sendError(ws, ctx.gpa, session.id, "INPUT_TOO_LONG", "Der Realtime-Text überschreitet 5000 Bytes.");
+                try sendError(ws, ctx.gpa, session.id, "INPUT_TOO_LONG", "Der Realtime-Text überschreitet " ++ limits.max_text_text ++ " Bytes.");
                 continue;
             }
             try pending.appendSlice(ctx.gpa, fragment);
@@ -68,9 +102,7 @@ pub fn serve(ws: *std.http.Server.WebSocket, ctx: *api_mod.Context) !void {
         } else if (std.mem.eql(u8, event_type, "response.cancel")) {
             const was_buffered = pending.items.len > 0;
             pending.clearRetainingCapacity();
-            try sendFmt(ws, ctx.gpa,
-                "{{\"type\":\"response.cancelled\",\"session_id\":\"sess_{x}\",\"cancelled_jobs\":{d}}}",
-                .{ session.id, if (was_buffered) @as(u8, 1) else @as(u8, 0) });
+            try sendFmt(ws, ctx.gpa, "{{\"type\":\"response.cancelled\",\"session_id\":\"sess_{x}\",\"cancelled_jobs\":{d}}}", .{ session.id, if (was_buffered) @as(u8, 1) else @as(u8, 0) });
         } else if (std.mem.eql(u8, event_type, "ping")) {
             try sendFmt(ws, ctx.gpa, "{{\"type\":\"pong\",\"session_id\":\"sess_{x}\"}}", .{session.id});
         } else {
@@ -79,21 +111,81 @@ pub fn serve(ws: *std.http.Server.WebSocket, ctx: *api_mod.Context) !void {
     }
 }
 
-fn applySession(session: *Session, value: std.json.Value) ?[]const u8 {
-    const voice = canonicalVoice(stringField(value, "voice", session.voice)) orelse return "INVALID_VOICE";
-    const language = canonicalLanguage(stringField(value, "language", session.language)) orelse return "UNSUPPORTED_LANGUAGE";
+/// Takes the voice, the language and the sample rate from the active model.
+///
+/// Without a model the session stays empty. The first request then reports
+/// that no model is ready.
+fn applyModelDefaults(ctx: *api_mod.Context, session: *Session) !void {
+    if (!ctx.engine.isActive()) return;
+
+    session.sample_rate = ctx.engine.sampleRate();
+
+    const language = ctx.engine.activeLanguage(ctx.gpa) catch return;
+    defer ctx.gpa.free(language);
+    try session.setLanguage(ctx.gpa, language);
+
+    const voice = ctx.engine.resolveVoice(ctx.gpa, "") catch return;
+    const resolved = voice orelse return;
+    defer ctx.gpa.free(resolved);
+    try session.setVoice(ctx.gpa, resolved);
+}
+
+/// Applies the configuration of a session update.
+///
+/// The voice and the language are checked against the active model. A name
+/// that the model does not know is an error, not a silent fallback.
+fn applySession(ctx: *api_mod.Context, session: *Session, value: std.json.Value) ?[]const u8 {
+    const requested_voice = stringField(value, "voice", session.voice);
+    const requested_language = stringField(value, "language", session.language);
+
+    // Der aufgeloeste Name bleibt bis zum Ende der Funktion gueltig. Wird er
+    // vorher freigegeben, zeigt `voice` auf freigegebenen Speicher. Der
+    // Allokator kann dann denselben Block fuer die Kopie vergeben, und die
+    // Kopie liest und schreibt denselben Speicher.
+    var resolved_voice: ?[]const u8 = null;
+    defer if (resolved_voice) |name| ctx.gpa.free(name);
+
+    var voice: []const u8 = session.voice;
+    if (requested_voice.len > 0) {
+        const resolved = ctx.engine.resolveVoice(ctx.gpa, requested_voice) catch return "INVALID_VOICE";
+        const name = resolved orelse return "INVALID_VOICE";
+        resolved_voice = name;
+        voice = name;
+    }
+
+    if (requested_language.len > 0 and !ctx.engine.languageMatches(requested_language)) {
+        return "UNSUPPORTED_LANGUAGE";
+    }
+
     const format = stringField(value, "format", session.format);
     if (!std.mem.eql(u8, format, "pcm")) return "UNSUPPORTED_FORMAT";
-    if (numberField(value, "sample_rate", 22050) != 22050) return "INVALID_SAMPLE_RATE";
-    if (numberField(value, "speed", 1) != 1) return "UNSUPPORTED_SETTING";
-    if (numberField(value, "cfg_scale", 2.5) != 2.5) return "UNSUPPORTED_SETTING";
-    if (!boolField(value, "cfg_enabled", true)) return "UNSUPPORTED_SETTING";
+
+    const model_sample_rate = ctx.engine.sampleRate();
+    if (numberField(value, "sample_rate", model_sample_rate) != model_sample_rate) return "INVALID_SAMPLE_RATE";
+
+    const speed = numberField(value, "speed", session.speed);
+    if (!limits.realtimeSpeedAllowed(@floatCast(speed))) return "UNSUPPORTED_SETTING";
+    if (numberField(value, "cfg_scale", 0) != 0) return "UNSUPPORTED_SETTING";
+    if (boolField(value, "cfg_enabled", false)) return "UNSUPPORTED_SETTING";
     if (boolField(value, "text_normalization", false)) return "UNSUPPORTED_SETTING";
-    session.voice = voice;
-    session.language = language;
+
+    session.setVoice(ctx.gpa, voice) catch return "INVALID_VOICE";
+    if (requested_language.len > 0) {
+        session.setLanguage(ctx.gpa, requested_language) catch return "UNSUPPORTED_LANGUAGE";
+    }
     session.format = "pcm";
-    session.sample_rate = 22050;
+    session.sample_rate = model_sample_rate;
+    session.speed = @floatCast(speed);
     return null;
+}
+
+/// The German text of an error code.
+fn errorText(code: []const u8) []const u8 {
+    if (std.mem.eql(u8, code, "INVALID_VOICE")) return "Das Modell kennt die angeforderte Stimme nicht.";
+    if (std.mem.eql(u8, code, "UNSUPPORTED_LANGUAGE")) return "Das Modell versteht die angeforderte Sprache nicht.";
+    if (std.mem.eql(u8, code, "UNSUPPORTED_FORMAT")) return "Der Realtime-Weg liefert nur rohes PCM.";
+    if (std.mem.eql(u8, code, "INVALID_SAMPLE_RATE")) return "Die Abtastrate des Modells kann nicht geändert werden.";
+    return "Die Session-Konfiguration enthält eine nicht unterstützte Option.";
 }
 
 fn synthesizePending(
@@ -112,14 +204,19 @@ fn synthesizePending(
     };
     defer ctx.gpa.free(text);
     if (!ctx.engine.isActive()) {
-        try sendError(ws, ctx.gpa, session.id, "MODEL_NOT_READY", "Die Magpie-Engine ist nicht bereit.");
+        try sendError(ws, ctx.gpa, session.id, "MODEL_NOT_READY", "Die Engine hat kein geladenes Modell.");
         return;
     }
 
     try sendFmt(ws, ctx.gpa, "{{\"type\":\"response.created\",\"session_id\":\"sess_{x}\"}}", .{session.id});
     const started = std.Io.Clock.awake.now(ctx.io);
-    const result = ctx.engine.synthesizeFor(text, session.language, session.voice) catch {
-        try sendError(ws, ctx.gpa, session.id, "SYNTHESIS_FAILED", "Die native Magpie-Synthese ist fehlgeschlagen.");
+    const result = ctx.engine.synthesizeFor(ctx.gpa, text, session.language, session.voice, session.speed) catch |err| {
+        const message = std.fmt.allocPrint(ctx.gpa, "Die Sprachsynthese ist fehlgeschlagen: {s}.", .{@errorName(err)}) catch {
+            try sendError(ws, ctx.gpa, session.id, "SYNTHESIS_FAILED", "Die Sprachsynthese ist fehlgeschlagen.");
+            return;
+        };
+        defer ctx.gpa.free(message);
+        try sendError(ws, ctx.gpa, session.id, "SYNTHESIS_FAILED", message);
         return;
     };
     defer ctx.gpa.free(result.pcm);
@@ -132,20 +229,16 @@ fn synthesizePending(
         const pcm_bytes = try ctx.gpa.alloc(u8, (end - offset) * 2);
         defer ctx.gpa.free(pcm_bytes);
         for (result.pcm[offset..end], 0..) |sample, i| {
-            const clamped = @max(-1.0, @min(1.0, sample));
-            const value: i16 = @intFromFloat(clamped * 32767.0);
-            std.mem.writeInt(i16, pcm_bytes[i * 2 ..][0..2], value, .little);
+            std.mem.writeInt(i16, pcm_bytes[i * 2 ..][0..2], audio_mod.quantize(sample), .little);
         }
-        try sendAudioChunk(ws, ctx.gpa, session, pcm_bytes, chunk_index);
+        try sendAudioChunk(ws, ctx.gpa, session, pcm_bytes, chunk_index, result.sample_rate);
         offset = end;
     }
 
     const elapsed_ns = @max(@as(i96, 0), started.durationTo(std.Io.Clock.awake.now(ctx.io)).nanoseconds);
     const ttfa_ms: f64 = @as(f64, @floatFromInt(elapsed_ns)) / 1_000_000.0;
     const duration: f64 = @as(f64, @floatFromInt(result.pcm.len)) / @as(f64, @floatFromInt(result.sample_rate));
-    try sendFmt(ws, ctx.gpa,
-        "{{\"type\":\"response.completed\",\"session_id\":\"sess_{x}\",\"duration_s\":{d:.3},\"ttfa_ms\":{d:.1}}}",
-        .{ session.id, duration, ttfa_ms });
+    try sendFmt(ws, ctx.gpa, "{{\"type\":\"response.completed\",\"session_id\":\"sess_{x}\",\"duration_s\":{d:.3},\"ttfa_ms\":{d:.1}}}", .{ session.id, duration, ttfa_ms });
 }
 
 fn sendAudioChunk(
@@ -154,6 +247,7 @@ fn sendAudioChunk(
     session: *const Session,
     pcm: []const u8,
     index: usize,
+    sample_rate: u32,
 ) !void {
     const encoded_len = std.base64.standard.Encoder.calcSize(pcm.len);
     const encoded = try gpa.alloc(u8, encoded_len);
@@ -162,16 +256,14 @@ fn sendAudioChunk(
     const message = try std.fmt.allocPrint(
         gpa,
         "{{\"type\":\"audio.chunk\",\"session_id\":\"sess_{x}\",\"data\":\"{s}\",\"format\":\"{s}\",\"sample_rate\":{d},\"chunk_index\":{d}}}",
-        .{ session.id, encoded, session.format, session.sample_rate, index },
+        .{ session.id, encoded, session.format, sample_rate, index },
     );
     defer gpa.free(message);
     try ws.writeMessage(message, .text);
 }
 
 fn sendError(ws: *std.http.Server.WebSocket, gpa: std.mem.Allocator, session_id: u64, code: []const u8, message: []const u8) !void {
-    try sendFmt(ws, gpa,
-        "{{\"type\":\"error\",\"error\":{{\"code\":\"{s}\",\"message\":\"{s}\",\"retryable\":false,\"session_id\":\"sess_{x}\"}}}}",
-        .{ code, message, session_id });
+    try sendFmt(ws, gpa, "{{\"type\":\"error\",\"error\":{{\"code\":\"{s}\",\"message\":\"{s}\",\"retryable\":false,\"session_id\":\"sess_{x}\"}}}}", .{ code, message, session_id });
 }
 
 fn sendFmt(ws: *std.http.Server.WebSocket, gpa: std.mem.Allocator, comptime fmt: []const u8, args: anytype) !void {
@@ -206,16 +298,4 @@ fn numberField(value: std.json.Value, name: []const u8, default: f64) f64 {
         .float => item.float,
         else => default,
     };
-}
-fn canonicalVoice(value: []const u8) ?[]const u8 {
-    const voices = [_][]const u8{ "Aria", "Jason", "John", "Leo", "Sofia" };
-    for (voices) |voice| if (std.ascii.eqlIgnoreCase(value, voice)) return voice;
-    return null;
-}
-fn canonicalLanguage(value: []const u8) ?[]const u8 {
-    const languages = [_][]const u8{ "en", "de", "es", "fr", "it", "pt-BR", "hi", "vi", "ko", "ar-AE", "ar-SA", "ar-MSA" };
-    for (languages) |language| if (std.ascii.eqlIgnoreCase(value, language)) return language;
-    if (std.ascii.eqlIgnoreCase(value, "pt")) return "pt-BR";
-    if (std.ascii.eqlIgnoreCase(value, "ar")) return "ar-MSA";
-    return null;
 }

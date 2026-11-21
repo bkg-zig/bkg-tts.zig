@@ -14,9 +14,8 @@ const unicode = @import("unicode.zig");
 const unicode_word = @import("unicode_word.zig");
 
 const ones = [_][]const u8{
-    "",     "one", "two",   "three", "four", "five",  "six",   "seven", "eight", "nine",
-    "ten",  "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen",
-    "seventeen", "eighteen", "nineteen",
+    "",    "one",    "two",    "three",    "four",     "five",    "six",     "seven",     "eight",    "nine",
+    "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen",
 };
 
 const tens = [_][]const u8{

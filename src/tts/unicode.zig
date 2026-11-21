@@ -28,6 +28,15 @@ pub fn isWhitespace(codepoint: u21) bool {
     };
 }
 
+/// Prueft, ob ein Codepoint nach der Python-Regel `str.isspace()` Leerraum ist.
+///
+/// Python zaehlt U+001C bis U+001F mit. Die Unicode-Eigenschaft White_Space
+/// enthaelt diese Zeichen nicht. Die Textpfade des PocketTTS-Laufs folgen
+/// Python, deshalb gilt dort diese Menge.
+pub fn isPythonWhitespace(codepoint: u21) bool {
+    return isWhitespace(codepoint) or (codepoint >= 0x001C and codepoint <= 0x001F);
+}
+
 /// Combining Class eines Codepoints. Null bedeutet "kein Markierungszeichen".
 pub fn combiningClass(codepoint: u21) u8 {
     var low: usize = 0;

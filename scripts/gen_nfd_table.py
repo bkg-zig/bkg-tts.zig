@@ -49,7 +49,14 @@ def main() -> int:
     out.write("pub const decompositions = [_]Decomposition{\n")
     for codepoint, parts in decompositions:
         joined = ", ".join(f"0x{part:X}" for part in parts)
-        out.write(f"    .{{ .codepoint = 0x{codepoint:X}, .parts = &[_]u21{{ {joined} }} }},\n")
+        # `zig fmt` schreibt ein einzelnes Element ohne Leerzeichen in den
+        # Klammern. Mehrere Elemente bekommen Leerzeichen. Die erzeugte Datei
+        # muss das Format von `zig fmt` treffen, sonst ist sie nicht pruefbar.
+        if len(parts) == 1:
+            body = f"{{{joined}}}"
+        else:
+            body = f"{{ {joined} }}"
+        out.write(f"    .{{ .codepoint = 0x{codepoint:X}, .parts = &[_]u21{body} }},\n")
     out.write("};\n")
     out.write("\n")
     out.write("/// Combining Class eines Codepoints, aufsteigend nach Codepoint sortiert.\n")

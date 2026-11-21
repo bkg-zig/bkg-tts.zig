@@ -1,4 +1,4 @@
 services:
-  bkg-magpietts-zig:
+  bkg-tts:
     ports:
-      - "127.0.0.1:${MAGPIE_HOST_PORT:-18093}:8092"
+      - "127.0.0.1:${BKG_TTS_HOST_PORT:-18093}:8092"
