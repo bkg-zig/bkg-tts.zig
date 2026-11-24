@@ -1,29 +1,42 @@
+name: bkg-tts
+
 services:
-  bkg-magpietts-zig:
-    image: ${BKG_MAGPIETTS_IMAGE:-bkg-magpietts-zig:latest}
-    container_name: bkg-magpietts-zig
+  bkg-tts:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: ${BKG_TTS_IMAGE:-bkg-tts-zig:local}
+    container_name: bkg-tts
     restart: unless-stopped
     init: true
     environment:
-      MAGPIE_HOST: "0.0.0.0"
-      MAGPIE_PORT: "8092"
-      MAGPIE_DEVICE: "cpu"
-      BKG_MAGPIE_LIB_PATH: "/usr/local/lib/libmagpie-tts.so"
-      BKG_MAGPIE_MODEL: "/srv/magpie/models/magpie-tts-multilingual-357m-q8_0.gguf"
-      MAGPIE_WEB_DIST: "/srv/magpie/web/dist"
-      MAGPIE_PRONUNCIATION_PATH: "/srv/magpie/data/pronunciation.json"
+      BKG_TTS_HOST: "0.0.0.0"
+      BKG_TTS_PORT: "8092"
+      BKG_TTS_MODELS_DIR: "/srv/bkg-tts/models"
+      BKG_TTS_ORT_LIBRARY: "/opt/onnxruntime/lib/libonnxruntime.so"
+      BKG_TTS_ESPEAK_LIBRARY: "/usr/lib/x86_64-linux-gnu/libespeak-ng.so.1"
+      BKG_TTS_ESPEAK_DATA: "/usr/lib/x86_64-linux-gnu/espeak-ng-data"
+      BKG_TTS_WEB_DIST: "/srv/bkg-tts/web/dist"
+      BKG_TTS_PRONUNCIATION_PATH: "/srv/bkg-tts/data/pronunciation.json"
+      # Optional. Ohne Wert benutzt die Registry ihr Vorgabemodell.
+      BKG_TTS_MODEL: "${BKG_TTS_MODEL:-}"
+      BKG_TTS_LANGUAGE: "${BKG_TTS_LANGUAGE:-}"
+      BKG_TTS_VOICE: "${BKG_TTS_VOICE:-}"
     volumes:
-      - ${MAGPIE_MODEL_DIR:-/srv/bkg/services/bkg-magpietts/models}:/srv/magpie/models:ro
-      - magpietts-data:/srv/magpie/data
+      # Die Modellgewichte kommen vom Host. Der Container liest sie nur.
+      - ${BKG_TTS_MODEL_DIR:-/srv/bkg/services/bkg-tts/models}:/srv/bkg-tts/models:ro
+      # Das Aussprachewoerterbuch liegt in einem Volume, weil der Container
+      # das Dateisystem sonst nicht beschreiben darf.
+      - bkg-tts-data:/srv/bkg-tts/data
     expose:
       - "8092"
     networks:
-      - bkg_net
+      - bkg-tts
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8092/health >/dev/null || exit 1"]
       interval: 30s
-      timeout: 3s
-      start_period: 180s
+      timeout: 5s
+      start_period: 120s
       retries: 3
     read_only: true
     tmpfs:
@@ -35,9 +48,10 @@ services:
     stop_grace_period: 30s
 
 networks:
-  bkg_net:
-    external: true
-    name: bkg_net
+  bkg-tts:
+    name: bkg-tts
+    driver: bridge
 
 volumes:
-  magpietts-data:
+  bkg-tts-data:
+    name: bkg-tts-data

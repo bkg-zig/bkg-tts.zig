@@ -1,0 +1,16 @@
+# Ergänzung für Modelle, die ein Hugging-Face-Token brauchen.
+#
+#   HF_TOKEN=... docker compose -f compose.yaml -f compose.hf.yaml up -d
+#
+# Das Token liegt nur als Datei im Container. Es steht nicht in der
+# Umgebung des Prozesses und nicht in einem Image.
+services:
+  bkg-tts:
+    environment:
+      BKG_TTS_HF_TOKEN_FILE: "/run/secrets/hf_token"
+    secrets:
+      - hf_token
+
+secrets:
+  hf_token:
+    environment: HF_TOKEN

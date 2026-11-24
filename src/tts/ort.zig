@@ -195,6 +195,7 @@ pub const TensorData = struct {
         if (self.element_type != .float) return error.UnexpectedElementType;
         if (self.bytes.len % @sizeOf(f32) != 0) return error.InvalidTensorSize;
         const aligned = self.bytes.ptr;
+        std.debug.print("asFloats bytes={d} address={x} alignment={d}\n", .{ self.bytes.len, @intFromPtr(aligned), @alignOf(f32) });
         const source: [*]const f32 = @ptrCast(@alignCast(aligned));
         return source[0 .. self.bytes.len / @sizeOf(f32)];
     }
@@ -617,7 +618,7 @@ fn readTensor(
         return error.MissingHandle;
     };
 
-    const width = @intFromEnum(@as(ElementType, @enumFromInt(element_type))).byteSize();
+    const width = (@as(ElementType, @enumFromInt(element_type))).byteSize();
     if (width == 0) {
         failure.set(0, "Der Ausgabetyp hat keine feste Bytebreite");
         return error.UnsupportedType;
@@ -627,7 +628,10 @@ fn readTensor(
         return error.AudioTooLarge;
     };
 
-    const bytes = try gpa.alloc(u8, byte_len);
+    // Float- und Integerdaten werden anschliessend direkt als f32 oder i64
+    // gelesen. Der Puffer muss deshalb mindestens die Ausrichtung dieser Typen
+    // besitzen. Ein normaler u8-Puffer kann nur Alignment 1 garantieren.
+    const bytes = try gpa.alignedAlloc(u8, .of(u64), byte_len);
     errdefer gpa.free(bytes);
     const source: [*]const u8 = @ptrCast(@alignCast(raw));
     @memcpy(bytes, source[0..byte_len]);

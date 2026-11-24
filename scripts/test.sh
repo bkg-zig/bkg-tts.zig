@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Baut Server, Tests, WASM-Modul und Weboberflaeche und prueft den
+# WASM-Vertrag im Browser-Format.
 set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
@@ -16,17 +18,18 @@ npm_cmd() {
 if [[ ! -x web/node_modules/.bin/vite ]]; then
   (cd web && npm_cmd ci --no-audit --no-fund)
 fi
-cp zig-out/bin/bkg-magpietts-wasm.wasm web/public/wasm/bkg-magpietts-wasm.wasm
+cp zig-out/bin/bkg-tts-wasm.wasm web/public/wasm/bkg-tts-wasm.wasm
 (cd web && npm_cmd run build)
 node - <<'JS'
 const fs = require('fs');
 (async () => {
-  const bytes = fs.readFileSync('zig-out/bin/bkg-magpietts-wasm.wasm');
+  const bytes = fs.readFileSync('zig-out/bin/bkg-tts-wasm.wasm');
   const {instance, module} = await WebAssembly.instantiate(bytes, {});
   const e = instance.exports;
-  if (e.bkg_magpie_contract_version() !== 1) throw new Error('bad WASM contract version');
-  if (e.bkg_magpie_sample_rate_allowed(22050) !== 1 || e.bkg_magpie_sample_rate_allowed(44100) !== 0) throw new Error('bad sample-rate validation');
-  if (e.bkg_magpie_voice_index(4) !== 4 || e.bkg_magpie_voice_index(5) !== 255) throw new Error('bad voice validation');
+  if (e.bkg_tts_contract_version() !== 1) throw new Error('bad WASM contract version');
+  if (e.bkg_tts_max_text_chars() !== 5000) throw new Error('bad text limit');
+  if (e.bkg_tts_speed_allowed(0.25) !== 1 || e.bkg_tts_speed_allowed(4.01) !== 0) throw new Error('bad tempo validation');
+  if (e.bkg_tts_realtime_speed_allowed(0.5) !== 1 || e.bkg_tts_realtime_speed_allowed(2.01) !== 0) throw new Error('bad realtime tempo validation');
   if (WebAssembly.Module.imports(module).length !== 0) throw new Error('WASM is not freestanding');
   console.log('WASM_OK exports=' + Object.keys(e).join(','));
 })().catch(e => { console.error(e); process.exit(1); });

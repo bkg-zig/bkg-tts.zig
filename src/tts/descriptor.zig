@@ -25,7 +25,7 @@ pub const Backend = enum {
     /// Phonem-IDs je Satz (Piper).
     phoneme_ids,
     /// Schrittweiser Decoder mit eigenem Tokenizer (Pocket-TTS).
-    pocket_step,
+    step,
 };
 
 /// Format der Stimmdatei.
@@ -142,6 +142,15 @@ pub const TextSpec = struct {
     clause_separator: []const u8 = " ",
     /// Maximale Laenge eines Abschnitts in Byte. Null schaltet die Aufteilung ab.
     chunk_chars: usize = 400,
+    /// Zeichen, an denen ein Abschnitt endet. Die Zeichen entfallen.
+    ///
+    /// Leer bedeutet: der Text wird nicht an Satzzeichen getrennt.
+    chunk_split: []const u8 = ".!?",
+    /// Zeichen, das an einen Abschnitt angehaengt wird, der nicht mit einem
+    /// Satzzeichen endet.
+    ///
+    /// Leer bedeutet: es wird nichts angehaengt.
+    chunk_punctuation: []const u8 = ",",
     /// Ersetzungen im Phonemtext.
     replacements: []const Replacement = &.{},
 };
@@ -157,11 +166,11 @@ pub const TokenizerSpec = struct {
     /// Feld der JSON-Datei, das die Phonem-ID-Map enthaelt.
     phoneme_id_map_field: []const u8 = "phoneme_id_map",
     /// ID vor dem Textkoerper.
-    start_id: i64 = 0,
+    start_id: ?i64 = 0,
     /// ID nach dem Textkoerper. Null laesst die ID weg.
     end_id: ?i64 = 10,
     /// ID am Ende der Folge.
-    pad_id: i64 = 0,
+    pad_id: ?i64 = 0,
     /// Schluessel des Starttokens in der Phonem-ID-Map.
     ///
     /// Der Rahmen einer Phonem-ID-Folge besteht aus drei Rollen: Start,
@@ -229,6 +238,79 @@ pub const OutputSpec = struct {
     normalize: OutputNormalize = .none,
 };
 
+/// Namen der Eingaben eines schrittweisen Decoders.
+///
+/// Der Graph eines schrittweisen Decoders rechnet in einem Lauf genau einen
+/// Schritt. Welcher Name zu welcher Rolle gehoert, steht im Deskriptor.
+pub const StepInputNames = struct {
+    /// Tokenfolge des Textes.
+    tokens: []const u8,
+    /// Latent des vorigen Schritts.
+    latent: []const u8,
+    /// Kennzeichen des ersten Schritts.
+    is_bos: []const u8,
+    /// Stimmbedingung.
+    cond: []const u8,
+    /// Schalter fuer Text, Latent und Bedingung.
+    gates: []const u8,
+    /// Zufallsrauschen des Samplers.
+    noise: []const u8,
+    /// Cache des Flow-LM.
+    flow_kv: []const u8,
+    /// Zahl der gueltigen Cacheeintraege des Flow-LM.
+    flow_offset: []const u8,
+    /// Cache des Mimi-Decoders.
+    mimi_kv: []const u8,
+    /// Schreibposition im Mimi-Cache.
+    mimi_offset: []const u8,
+    /// Zustand der Faltung des Mimi-Decoders.
+    mimi_conv: []const u8,
+    /// Zahl der Schritte des Samplers.
+    decode_steps: []const u8,
+    /// Schalter des optionalen Adapters.
+    ///
+    /// Leer bedeutet: der Graph kennt keinen Adapter. Der Wert wird dann
+    /// nicht gesetzt und der Graph laeuft ohne Adapter.
+    lora: ?[]const u8 = null,
+};
+
+/// Namen der Ausgaben eines schrittweisen Decoders.
+pub const StepOutputNames = struct {
+    /// Audiodaten des Schritts.
+    audio: []const u8,
+    /// Latent des naechsten Schritts.
+    next_latent: []const u8,
+    /// Logit des Endzeichens.
+    eos_logit: []const u8,
+    /// Neue Eintraege des Flow-Caches.
+    flow_kv_new: []const u8,
+    /// Neue Eintraege des Mimi-Caches.
+    mimi_kv_new: []const u8,
+    /// Schreibposition im Mimi-Cache nach dem Schritt.
+    mimi_offset_out: []const u8,
+    /// Zustand der Faltung nach dem Schritt.
+    mimi_conv_out: []const u8,
+};
+
+/// Angaben zum schrittweisen Decoder.
+///
+/// Der Decoder holt seine Konfiguration, seinen Tokenizer und seine Stimmen
+/// aus den Metadaten der ONNX-Datei. Die Schluessel dieser Metadaten und die
+/// Namen der Graph-Ein- und Ausgaenge stehen hier, damit der Code keine
+/// Modellfamilie kennt.
+pub const StepSpec = struct {
+    /// Metadatenschluessel der JSON-Konfiguration des Modells.
+    config_key: []const u8,
+    /// Metadatenschluessel des Tokenizers.
+    tokenizer_key: []const u8,
+    /// Praefix der Metadatenschluessel der Stimmen.
+    voice_prefix: []const u8,
+    /// Namen der Eingaben des Graphen.
+    inputs: StepInputNames,
+    /// Namen der Ausgaben des Graphen.
+    outputs: StepOutputNames,
+};
+
 /// Ein Alias einer Stimme.
 pub const VoiceAlias = struct {
     alias: []const u8,
@@ -269,6 +351,8 @@ pub const Descriptor = struct {
     inputs: InputNames,
     /// Angaben zum ONNX-Ausgang.
     output: OutputSpec,
+    /// Angaben zum schrittweisen Decoder. Null bei anderen Verarbeitungswegen.
+    step: ?StepSpec,
     /// Aliase der Stimmen.
     voice_aliases: []const VoiceAlias,
     /// Tempopriors der Stimmen.
@@ -394,6 +478,7 @@ pub fn parse(
         .style = try parseStyle(root),
         .inputs = try parseInputs(mem, root),
         .output = try parseOutput(mem, root),
+        .step = try parseStep(mem, root),
         .voice_aliases = try parseVoiceAliases(mem, root),
         .speed_priors = try parseSpeedPriors(mem, root),
         .espeak = try parseEspeak(mem, root),
@@ -401,6 +486,10 @@ pub fn parse(
         .raw = try mem.dupe(u8, data),
         .base_dir = base_dir_absolute,
     };
+
+    // Ein schrittweiser Decoder braucht die Angaben zu seinen Ein- und
+    // Ausgaengen. Ohne sie laesst sich der Graph nicht ansprechen.
+    if (backend == .step and descriptor.step == null) return error.MissingStepSpec;
 
     // Die Arena wird erst nach allen Allokationen kopiert. Sie merkt sich
     // die belegten Bloecke in ihrem eigenen Zustand. Eine frueher Kopie
@@ -504,6 +593,14 @@ fn parseText(mem: std.mem.Allocator, root: std.json.ObjectMap) !TextSpec {
         spec.chunk_chars = @intCast(number);
     }
 
+    if (try jsonString(object, "chunk_split")) |chars| {
+        spec.chunk_split = try mem.dupe(u8, chars);
+    }
+
+    if (try jsonString(object, "chunk_punctuation")) |punctuation| {
+        spec.chunk_punctuation = try mem.dupe(u8, punctuation);
+    }
+
     spec.replacements = try parseReplacements(mem, object);
 
     return spec;
@@ -574,16 +671,11 @@ fn parseTokenizer(mem: std.mem.Allocator, root: std.json.ObjectMap, base_dir: []
         spec.phoneme_id_map_field = try mem.dupe(u8, field);
     }
 
-    if (try optionalInt(object, "start_id")) |number| spec.start_id = number;
-    if (object.get("end_id")) |end_value| {
-        spec.end_id = switch (end_value) {
-            .null => null,
-            .integer => |number| number,
-            .float => |number| @as(i64, @intFromFloat(number)),
-            else => return error.ExpectedInteger,
-        };
-    }
-    if (try optionalInt(object, "pad_id")) |number| spec.pad_id = number;
+    // Der Rahmen der Tokenfolge besteht aus Start-, End- und Fuellzeichen.
+    // "null" bedeutet: das Zeichen fehlt in der Folge.
+    if (object.get("start_id")) |id_value| spec.start_id = try parseId(id_value);
+    if (object.get("end_id")) |id_value| spec.end_id = try parseId(id_value);
+    if (object.get("pad_id")) |id_value| spec.pad_id = try parseId(id_value);
     if (try optionalBool(object, "word_split")) |flag| spec.word_split = flag;
 
     if (try jsonString(object, "start_key")) |key| spec.start_key = try mem.dupe(u8, key);
@@ -813,8 +905,65 @@ fn parseBackend(text: []const u8) !Backend {
     if (std.mem.eql(u8, text, "onnx_ar")) return .style_tokens;
     if (std.mem.eql(u8, text, "style_tokens")) return .style_tokens;
     if (std.mem.eql(u8, text, "phoneme_ids")) return .phoneme_ids;
-    if (std.mem.eql(u8, text, "pocket_step")) return .pocket_step;
+    if (std.mem.eql(u8, text, "step")) return .step;
     return error.UnknownBackend;
+}
+
+/// Liest die Angaben zum schrittweisen Decoder.
+///
+/// Der Block "step" nennt die Metadatenschluessel der Konfiguration, des
+/// Tokenizers und der Stimmen sowie die Namen der Ein- und Ausgaenge des
+/// Graphen. Alle Felder sind Pflicht. Nur der optionale Adapter "lora" darf
+/// fehlen.
+fn parseStep(mem: std.mem.Allocator, root: std.json.ObjectMap) !?StepSpec {
+    const value = root.get("step") orelse return null;
+
+    const object = switch (value) {
+        .object => |object| object,
+        else => return error.ExpectedObject,
+    };
+
+    const inputs_object = switch (object.get("inputs") orelse return error.MissingField) {
+        .object => |inputs| inputs,
+        else => return error.ExpectedObject,
+    };
+    const outputs_object = switch (object.get("outputs") orelse return error.MissingField) {
+        .object => |outputs| outputs,
+        else => return error.ExpectedObject,
+    };
+
+    return .{
+        .config_key = try mem.dupe(u8, try requiredString(object, "config_key")),
+        .tokenizer_key = try mem.dupe(u8, try requiredString(object, "tokenizer_key")),
+        .voice_prefix = try mem.dupe(u8, try requiredString(object, "voice_prefix")),
+        .inputs = .{
+            .tokens = try mem.dupe(u8, try requiredString(inputs_object, "tokens")),
+            .latent = try mem.dupe(u8, try requiredString(inputs_object, "latent")),
+            .is_bos = try mem.dupe(u8, try requiredString(inputs_object, "is_bos")),
+            .cond = try mem.dupe(u8, try requiredString(inputs_object, "cond")),
+            .gates = try mem.dupe(u8, try requiredString(inputs_object, "gates")),
+            .noise = try mem.dupe(u8, try requiredString(inputs_object, "noise")),
+            .flow_kv = try mem.dupe(u8, try requiredString(inputs_object, "flow_kv")),
+            .flow_offset = try mem.dupe(u8, try requiredString(inputs_object, "flow_offset")),
+            .mimi_kv = try mem.dupe(u8, try requiredString(inputs_object, "mimi_kv")),
+            .mimi_offset = try mem.dupe(u8, try requiredString(inputs_object, "mimi_offset")),
+            .mimi_conv = try mem.dupe(u8, try requiredString(inputs_object, "mimi_conv")),
+            .decode_steps = try mem.dupe(u8, try requiredString(inputs_object, "decode_steps")),
+            .lora = if (try jsonString(inputs_object, "lora")) |name|
+                try mem.dupe(u8, name)
+            else
+                null,
+        },
+        .outputs = .{
+            .audio = try mem.dupe(u8, try requiredString(outputs_object, "audio")),
+            .next_latent = try mem.dupe(u8, try requiredString(outputs_object, "next_latent")),
+            .eos_logit = try mem.dupe(u8, try requiredString(outputs_object, "eos_logit")),
+            .flow_kv_new = try mem.dupe(u8, try requiredString(outputs_object, "flow_kv_new")),
+            .mimi_kv_new = try mem.dupe(u8, try requiredString(outputs_object, "mimi_kv_new")),
+            .mimi_offset_out = try mem.dupe(u8, try requiredString(outputs_object, "mimi_offset_out")),
+            .mimi_conv_out = try mem.dupe(u8, try requiredString(outputs_object, "mimi_conv_out")),
+        },
+    };
 }
 
 /// Liest ein Pflichtfeld vom Typ Text.
@@ -833,6 +982,16 @@ fn jsonString(object: std.json.ObjectMap, name: []const u8) !?[]const u8 {
 
 fn optionalInt(object: std.json.ObjectMap, name: []const u8) !?i64 {
     const value = object.get(name) orelse return null;
+    return switch (value) {
+        .integer => |number| number,
+        .float => |number| @as(i64, @intFromFloat(number)),
+        .null => null,
+        else => error.ExpectedInteger,
+    };
+}
+
+/// Liest eine Token-ID. "null" bedeutet: das Zeichen fehlt in der Folge.
+fn parseId(value: std.json.Value) !?i64 {
     return switch (value) {
         .integer => |number| number,
         .float => |number| @as(i64, @intFromFloat(number)),
@@ -992,12 +1151,14 @@ test "Deskriptor liest die Kitten-Konfiguration mit den Vorgabewerten" {
     try testing.expectEqualStrings("en-us", descriptor.text.language);
     try testing.expectEqual(PreprocessMode.numbers, descriptor.text.preprocess);
     try testing.expectEqual(@as(usize, 400), descriptor.text.chunk_chars);
+    try testing.expectEqualStrings(".!?", descriptor.text.chunk_split);
+    try testing.expectEqualStrings(",", descriptor.text.chunk_punctuation);
     try testing.expectEqualStrings(" ", descriptor.text.clause_separator);
 
     try testing.expectEqual(TokenizerMode.builtin, descriptor.tokenizer.mode);
-    try testing.expectEqual(@as(i64, 0), descriptor.tokenizer.start_id);
+    try testing.expectEqual(@as(?i64, 0), descriptor.tokenizer.start_id);
     try testing.expectEqual(@as(?i64, 10), descriptor.tokenizer.end_id);
-    try testing.expectEqual(@as(i64, 0), descriptor.tokenizer.pad_id);
+    try testing.expectEqual(@as(?i64, 0), descriptor.tokenizer.pad_id);
     try testing.expect(descriptor.tokenizer.word_split);
     try testing.expectEqual(tokens.SymbolScheme.first_wins, descriptor.tokenizer.symbol_scheme);
 
@@ -1135,6 +1296,8 @@ const full_config =
     \\    "append_terminator": true,
     \\    "clause_separator": "\n",
     \\    "chunk_chars": 0,
+    \\    "chunk_split": ";|",
+    \\    "chunk_punctuation": "",
     \\    "replacements": [
     \\      {"from": "alt", "to": "neu"}
     \\    ]
@@ -1173,6 +1336,8 @@ test "Deskriptor liest Textmodus, espeak, Inference und Ein- Ausgaben" {
     try testing.expect(descriptor.text.append_terminator);
     try testing.expectEqualStrings("\n", descriptor.text.clause_separator);
     try testing.expectEqual(@as(usize, 0), descriptor.text.chunk_chars);
+    try testing.expectEqualStrings(";|", descriptor.text.chunk_split);
+    try testing.expectEqualStrings("", descriptor.text.chunk_punctuation);
 
     try testing.expectEqual(@as(usize, 1), descriptor.text.replacements.len);
     try testing.expectEqualStrings("alt", descriptor.text.replacements[0].from);
@@ -1225,6 +1390,8 @@ test "Kopie des Deskriptors traegt eigene Texte und denselben Fingerabdruck" {
     try testing.expectEqual(descriptor.fingerprint(), copy.fingerprint());
     try testing.expectEqualStrings(descriptor.model_file, copy.model_file);
     try testing.expectEqualStrings(descriptor.text.clause_separator, copy.text.clause_separator);
+    try testing.expectEqualStrings(descriptor.text.chunk_split, copy.text.chunk_split);
+    try testing.expectEqualStrings(descriptor.text.chunk_punctuation, copy.text.chunk_punctuation);
 
     // Die Kopie haelt ihren eigenen Speicher. Der Deskriptor darf unveraendert
     // weiterleben, wenn die Registry ihn austauscht.

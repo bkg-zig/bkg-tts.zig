@@ -1,91 +1,108 @@
 import { useEffect, useState } from 'react'
-import { api, switchProfile } from '../api'
+import { activateModel, listModels, reloadRegistry, type ModelInfo } from '../api'
 import { Card, Badge, Spinner } from '../components/ui'
 
-interface Profile { id: string; name: string; precision: string; description: string; status: string; loadable: boolean; measured_vram_mb: number | null; last_load_ms: number | null }
-
 export function Models() {
-  const [profiles, setProfiles] = useState<Profile[]>([])
-  const [current, setCurrent] = useState<string | null>(null)
-  const [state, setState] = useState<string>('')
-  const [busy, setBusy] = useState(false)
+  const [models, setModels] = useState<ModelInfo[]>([])
+  const [busy, setBusy] = useState<string | null>(null)
   const [log, setLog] = useState<string[]>([])
+  const [error, setError] = useState<string | null>(null)
 
   const load = async () => {
-    try {
-      const r = await api<any>('/api/profiles')
-      setProfiles(r.data)
-      setCurrent(r.current)
-      setState(r.state)
-    } catch { /* offline */ }
+    setModels(await listModels())
   }
-  useEffect(() => { load(); const id = setInterval(load, 4000); return () => clearInterval(id) }, [])
 
-  const switchTo = async (id: string) => {
-    setBusy(true)
+  useEffect(() => {
+    load().catch(() => {})
+  }, [])
+
+  const activate = async (model: ModelInfo) => {
+    setBusy(model.id)
+    setError(null)
     try {
-      const r = await switchProfile(id)
-      setLog((l) => [...l.slice(-40), `→ ${id}: ${JSON.stringify(r.model?.state)}`])
+      await activateModel(model)
+      setLog((entries) => [...entries.slice(-40), `→ ${model.id}: active`])
       await load()
     } catch (e: any) {
-      setLog((l) => [...l.slice(-40), `✗ ${id}: ${e.message}`])
+      setError(`${model.id}: ${e.message}`)
+    } finally {
+      setBusy(null)
     }
-    setBusy(false)
   }
 
-  const precisionBadge = (p: string) =>
-    p === 'int8' || p === 'int4'
-      ? <Badge color="red">experimental</Badge>
-      : p === 'fp16' ? <Badge color="green">{p}</Badge> : <Badge color="blue">{p}</Badge>
+  const reload = async () => {
+    setBusy('reload')
+    setError(null)
+    try {
+      const summary = await reloadRegistry()
+      setLog((entries) => [
+        ...entries.slice(-40),
+        `reload: +${summary.added.length} ~${summary.changed.length} -${summary.removed.length}, active ${summary.active_model ?? 'none'}`,
+      ])
+      await load()
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setBusy(null)
+    }
+  }
 
   return (
     <div className="space-y-6 max-w-6xl">
-      <h1 className="text-2xl font-bold">Model / Precision Manager</h1>
-      {state === 'switching' && <Spinner label="model is switching profiles…" />}
-      <Card title="Profiles">
+      <h1 className="text-2xl font-bold">Models</h1>
+      <p className="text-sm text-zinc-400">
+        The registry lists every model directory that holds a descriptor. The active model runs on the CPU.
+        A synthesis request with the field model switches the engine to that model.
+      </p>
+      <Card title="Registry">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs uppercase text-zinc-500">
-              <th className="pb-2">Profile</th><th className="pb-2">Precision</th>
-              <th className="pb-2">Status</th><th className="pb-2">VRAM (measured)</th>
-              <th className="pb-2">Load time</th><th className="pb-2"></th>
+              <th className="pb-2">Model</th>
+              <th className="pb-2">Version</th>
+              <th className="pb-2">Language</th>
+              <th className="pb-2">Sample rate</th>
+              <th className="pb-2">State</th>
+              <th className="pb-2"></th>
             </tr>
           </thead>
           <tbody>
-            {profiles.map((p) => (
-              <tr key={p.id} className="border-t border-zinc-800">
-                <td className="py-2 font-medium">{p.name}</td>
-                <td className="py-2">{precisionBadge(p.precision)}</td>
+            {models.length === 0 && (
+              <tr><td className="py-2 text-zinc-600" colSpan={6}>No model registered.</td></tr>
+            )}
+            {models.map((model) => (
+              <tr key={model.id} className="border-t border-zinc-800">
+                <td className="py-2 font-medium">{model.name}</td>
+                <td className="py-2 mono text-zinc-400">{model.version}</td>
+                <td className="py-2 mono">{model.language}</td>
+                <td className="py-2 mono">{model.sample_rate} Hz</td>
                 <td className="py-2">
-                  {current === p.id ? <Badge color="green">ACTIVE</Badge>
-                    : p.status === 'missing' ? <Badge color="red">MISSING</Badge>
-                    : <Badge>{p.status.toUpperCase()}</Badge>}
+                  {model.loaded ? <Badge color="green">active</Badge> : <Badge>{model.state}</Badge>}
                 </td>
-                <td className="py-2 mono">{p.measured_vram_mb != null ? `${p.measured_vram_mb} MB` : '—'}</td>
-                <td className="py-2 mono">{p.last_load_ms != null ? `${p.last_load_ms.toFixed(0)} ms` : '—'}</td>
                 <td className="py-2 text-right">
-                  {current === p.id ? (
-                    <span className="text-xs text-zinc-500">Active</span>
-                  ) : p.loadable ? (
-                    <button className="btn text-xs" onClick={() => switchTo(p.id)} disabled={busy || state === 'switching'}>
-                      Load
-                    </button>
+                  {model.loaded ? (
+                    <span className="text-xs text-zinc-500">Loaded</span>
                   ) : (
-                    <button className="btn text-xs opacity-60" disabled title={p.description}>Setup</button>
+                    <button className="btn text-xs" onClick={() => activate(model)} disabled={busy !== null}>
+                      Activate
+                    </button>
                   )}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        <p className="mt-3 text-xs text-zinc-500">
-          INT8/INT4 remain unavailable until a validated conversion/runtime is installed. Never guessed VRAM — only measured values are shown.
-        </p>
+        <div className="mt-3 flex items-center gap-2">
+          <button className="btn" onClick={reload} disabled={busy !== null}>Reload registry</button>
+          {busy === 'reload' && <Spinner label="reading the model directories" />}
+          {busy !== null && busy !== 'reload' && <Spinner label={`switching to ${busy}`} />}
+        </div>
       </Card>
-      <Card title="Switch history">
+      {error && <div className="text-sm text-red-400">{error}</div>}
+      <Card title="Actions">
         <div className="mono text-xs space-y-1 h-40 overflow-y-auto">
-          {log.length === 0 && <div className="text-zinc-600">No switches yet.</div>}
-          {log.map((l, i) => <div key={i}>{l}</div>)}
+          {log.length === 0 && <div className="text-zinc-600">No actions yet.</div>}
+          {log.map((entry, index) => <div key={index}>{entry}</div>)}
         </div>
       </Card>
     </div>

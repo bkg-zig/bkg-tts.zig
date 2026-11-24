@@ -54,8 +54,8 @@ pub fn build(b: *std.Build) void {
     if (b.args) |args| run_probe.addArgs(args);
     b.step("probe", "Print the runtime contract of an ONNX model").dependOn(&run_probe.step);
 
-    // Browser WASM stays isolated from libc, sockets and libmagpie-tts.so.
-    // React loads this freestanding module for deterministic client-side logic.
+    // Browser WASM stays isolated from libc, sockets and the ONNX runtime.
+    // React loads this freestanding module for the limits of the HTTP contract.
     const wasm_target = b.resolveTargetQuery(.{
         .cpu_arch = .wasm32,
         .os_tag = .freestanding,
@@ -66,7 +66,7 @@ pub fn build(b: *std.Build) void {
         .optimize = .ReleaseSmall,
     });
     const wasm_exe = b.addExecutable(.{
-        .name = "bkg-magpietts-wasm",
+        .name = "bkg-tts-wasm",
         .root_module = wasm_module,
     });
     wasm_exe.entry = .disabled;

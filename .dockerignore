@@ -1,0 +1,11 @@
+.git
+.brain
+.zig-cache
+zig-out
+web/node_modules
+web/dist
+web/public/wasm/*.wasm
+*.wav
+*.pcm
+*.log
+tmp_*.zig

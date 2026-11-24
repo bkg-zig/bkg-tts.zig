@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
+# Baut das WASM-Modul und danach die Weboberflaeche.
 set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 zig build wasm
 mkdir -p web/public/wasm
-cp zig-out/bin/bkg-magpietts-wasm.wasm web/public/wasm/bkg-magpietts-wasm.wasm
+cp zig-out/bin/bkg-tts-wasm.wasm web/public/wasm/bkg-tts-wasm.wasm
 npm_cli=""
 node_dir="$(dirname "$(readlink -f "$(command -v node)")")"
 for candidate in   "$node_dir/../lib/node_modules/npm/bin/npm-cli.js"   "$node_dir/../share/nodejs/npm/bin/npm-cli.js"   "/usr/share/nodejs/npm/bin/npm-cli.js"; do

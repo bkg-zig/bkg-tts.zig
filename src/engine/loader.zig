@@ -76,6 +76,24 @@ pub const Indices = struct {
     output: usize,
 };
 
+/// Elementtypen der Eingaben des Graphen.
+///
+/// Der Graph entscheidet, ob eine Tokenfolge aus 32- oder 64-Bit-
+/// Ganzzahlen besteht. Das Backend liest die Typen hier und muss sie nicht
+/// selbst kennen.
+pub const InputTypes = struct {
+    /// Elementtyp der Tokenfolge.
+    tokens: ort.ElementType = .undefined_,
+    /// Elementtyp des Stimmembeddings.
+    style: ?ort.ElementType = null,
+    /// Elementtyp des Sprechtempos.
+    speed: ?ort.ElementType = null,
+    /// Elementtyp der Laengenangabe.
+    lengths: ?ort.ElementType = null,
+    /// Elementtyp der Inferenzwerte.
+    scales: ?ort.ElementType = null,
+};
+
 /// Ein geladenes Modell mit allen Mitteln fuer die Synthese.
 pub const Model = struct {
     /// Allocator fuer alle Puffer des Modells.
@@ -94,6 +112,8 @@ pub const Model = struct {
     sample_rate: u32,
     /// Indices der Ein- und Ausgaenge im Graphen.
     indices: Indices,
+    /// Elementtypen der Eingaben im Graphen.
+    types: InputTypes,
 
     pub fn deinit(self: *Model) void {
         self.session.deinit(self.gpa);
@@ -117,7 +137,7 @@ pub fn load(
     desc: *const descriptor.Descriptor,
     options: Options,
 ) !*Model {
-    if (desc.backend == .pocket_step) return error.UnsupportedBackend;
+    if (desc.backend == .step) return error.UnsupportedBackend;
 
     // Das Modell arbeitet mit einer eigenen Kopie des Deskriptors. Die
     // Registry darf ihren Deskriptor austauschen, ohne das laufende Modell
@@ -137,6 +157,7 @@ pub fn load(
         .espeak = undefined,
         .sample_rate = options.default_sample_rate,
         .indices = undefined,
+        .types = .{},
     };
     errdefer model.desc.deinit();
 
@@ -151,6 +172,7 @@ pub fn load(
     errdefer model.session.deinit(gpa);
 
     model.indices = try resolveIndices(&model.session, owned);
+    model.types = try readInputTypes(gpa, &model.session, model.indices);
     model.table = try loadVoices(gpa, io, owned);
     errdefer model.table.deinit();
 
@@ -188,6 +210,49 @@ fn resolveIndices(session: *const ort.Session, desc: *const descriptor.Descripto
         .scales = if (desc.inputs.scales) |name| session.inputIndexByName(name) else null,
         .output = output_index,
     };
+}
+
+/// Liest die Elementtypen der Eingaben des Graphen.
+///
+/// Nur die Tokenfolge ist Pflicht. Die anderen Typen fehlen, wenn der Graph
+/// den Eingang nicht kennt.
+fn readInputTypes(
+    gpa: std.mem.Allocator,
+    session: *const ort.Session,
+    indices: Indices,
+) !InputTypes {
+    var failure: ort.Failure = .{};
+    var types: InputTypes = .{};
+
+    types.tokens = try readType(gpa, session, indices.tokens, &failure);
+    types.style = try readOptionalType(gpa, session, indices.style, &failure);
+    types.speed = try readOptionalType(gpa, session, indices.speed, &failure);
+    types.lengths = try readOptionalType(gpa, session, indices.lengths, &failure);
+    types.scales = try readOptionalType(gpa, session, indices.scales, &failure);
+    return types;
+}
+
+/// Liest den Elementtyp eines Eingangs.
+fn readType(
+    gpa: std.mem.Allocator,
+    session: *const ort.Session,
+    index: usize,
+    failure: *ort.Failure,
+) !ort.ElementType {
+    var info = try session.inputInfo(gpa, index, failure);
+    defer info.deinit();
+    return info.element_type;
+}
+
+/// Liest den Elementtyp eines optionalen Eingangs.
+fn readOptionalType(
+    gpa: std.mem.Allocator,
+    session: *const ort.Session,
+    index: ?usize,
+    failure: *ort.Failure,
+) !?ort.ElementType {
+    const position = index orelse return null;
+    return try readType(gpa, session, position, failure);
 }
 
 /// Laedt die Stimmdaten.

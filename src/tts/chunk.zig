@@ -1,23 +1,37 @@
 //! Aufteilung eines Textes in Abschnitte, die einzeln synthetisiert werden.
 //!
-//! Die Regeln entsprechen der Kitten-Referenz:
+//! Die Regeln stehen in `Options`. Der Deskriptor des Modells liefert sie:
 //!
-//! * Der Text wird an Folgen von Punkt, Frage- und Ausrufezeichen getrennt,
-//!   die Trenner entfallen.
+//! * Der Text wird an den Zeichen aus `split_chars` getrennt, die Trenner
+//!   entfallen.
 //! * Jeder Abschnitt wird getrimmt und leerer Inhalt wird uebersprungen.
-//! * Ein Abschnitt, der laenger als die Grenze ist, wird an Wortgrenzen
+//! * Ein Abschnitt, der laenger als `max_len` ist, wird an Wortgrenzen
 //!   geteilt. Die Grenze wird in Bytes gemessen.
-//! * Ein Abschnitt ohne Satzzeichen am Ende bekommt ein Komma angehaengt.
+//! * Ein Abschnitt ohne Satzzeichen am Ende bekommt `append_punctuation`
+//!   angehaengt.
+//!
+//! Die Vorgaben entsprechen der Kitten-Referenz. Modelle, die den Text
+//! unveraendert brauchen, setzen `split_chars` und `append_punctuation` auf
+//! einen leeren String.
 
 const std = @import("std");
 
 const unicode = @import("unicode.zig");
 
-/// Zeichen, an denen ein Abschnitt endet.
-const sentence_end = ".!?";
-
 /// Zeichen, nach denen ein Abschnitt bereits mit Satzzeichen endet.
 const sentence_terminators = ".!?,;:";
+
+/// Regeln fuer die Aufteilung eines Textes in Abschnitte.
+pub const Options = struct {
+    /// Maximale Laenge eines Abschnitts in Byte. Null schaltet die Grenze ab.
+    max_len: usize = 400,
+    /// Zeichen, an denen ein Abschnitt endet. Die Zeichen entfallen.
+    /// Leer bedeutet: der Text wird nicht getrennt.
+    split_chars: []const u8 = ".!?",
+    /// Zeichen, das an einen Abschnitt angehaengt wird, der nicht mit einem
+    /// Satzzeichen endet. Leer bedeutet: es wird nichts angehaengt.
+    append_punctuation: []const u8 = ",",
+};
 
 /// Eine Liste von Textabschnitten mit eigenem Speicher.
 pub const ChunkList = struct {
@@ -30,11 +44,11 @@ pub const ChunkList = struct {
     }
 };
 
-/// Teilt den Text in Abschnitte, die hoechstens `max_len` Bytes lang sind.
+/// Teilt den Text nach den Regeln aus `options` in Abschnitte.
 ///
-/// `max_len` von null schaltet die Aufteilung ab. Dann wird der Text an den
-/// Satzzeichen getrennt, aber nicht an Wortgrenzen.
-pub fn chunkText(gpa: std.mem.Allocator, text: []const u8, max_len: usize) !ChunkList {
+/// `options.max_len` von null schaltet die Aufteilung an Wortgrenzen ab.
+/// `options.split_chars` ohne Zeichen schaltet die Trennung an Satzzeichen ab.
+pub fn chunkText(gpa: std.mem.Allocator, text: []const u8, options: Options) !ChunkList {
     var chunks: std.ArrayList([]u8) = .empty;
     errdefer {
         for (chunks.items) |item| gpa.free(item);
@@ -43,32 +57,38 @@ pub fn chunkText(gpa: std.mem.Allocator, text: []const u8, max_len: usize) !Chun
 
     var sentences: std.ArrayList([]const u8) = .empty;
     defer sentences.deinit(gpa);
-    try splitSentences(gpa, text, &sentences);
+    try splitSentences(gpa, text, options.split_chars, &sentences);
 
     for (sentences.items) |raw| {
         const sentence = trimUnicode(raw);
         if (sentence.len == 0) continue;
 
-        if (max_len == 0 or sentence.len <= max_len) {
-            try chunks.append(gpa, try ensurePunctuation(gpa, sentence));
+        if (options.max_len == 0 or sentence.len <= options.max_len) {
+            try chunks.append(gpa, try ensurePunctuation(gpa, sentence, options.append_punctuation));
             continue;
         }
-        try splitLongSentence(gpa, sentence, max_len, &chunks);
+        try splitLongSentence(gpa, sentence, options, &chunks);
     }
 
     return .{ .gpa = gpa, .items = try chunks.toOwnedSlice(gpa) };
 }
 
-/// Haengt ein Komma an, wenn der Abschnitt nicht mit einem Satzzeichen endet.
-pub fn ensurePunctuation(gpa: std.mem.Allocator, text: []const u8) ![]u8 {
+/// Haengt `punctuation` an, wenn der Abschnitt nicht mit einem Satzzeichen endet.
+///
+/// Ein leeres `punctuation` laesst den Abschnitt unveraendert.
+pub fn ensurePunctuation(
+    gpa: std.mem.Allocator,
+    text: []const u8,
+    punctuation: []const u8,
+) ![]u8 {
     const trimmed = trimUnicode(text);
-    if (trimmed.len == 0) return gpa.dupe(u8, trimmed);
+    if (trimmed.len == 0 or punctuation.len == 0) return gpa.dupe(u8, trimmed);
 
     const last = lastCodepoint(trimmed) orelse return gpa.dupe(u8, trimmed);
     if (last <= 0x7F and std.mem.indexOfScalar(u8, sentence_terminators, @intCast(last)) != null) {
         return gpa.dupe(u8, trimmed);
     }
-    return std.fmt.allocPrint(gpa, "{s},", .{trimmed});
+    return std.fmt.allocPrint(gpa, "{s}{s}", .{ trimmed, punctuation });
 }
 
 /// Entfernt Leerraum an beiden Enden.
@@ -122,21 +142,28 @@ fn lastCodepoint(text: []const u8) ?u21 {
     return next.codepoint;
 }
 
-/// Trennt den Text an Folgen von Satzzeichen. Die Trenner entfallen.
+/// Trennt den Text an Folgen der Zeichen aus `split_chars`. Die Trenner
+/// entfallen. Ohne `split_chars` bleibt der Text ungeteilt.
 fn splitSentences(
     gpa: std.mem.Allocator,
     text: []const u8,
+    split_chars: []const u8,
     out: *std.ArrayList([]const u8),
 ) !void {
+    if (split_chars.len == 0) {
+        try out.append(gpa, text);
+        return;
+    }
+
     var start: usize = 0;
     var index: usize = 0;
     while (index < text.len) {
-        if (std.mem.indexOfScalar(u8, sentence_end, text[index]) == null) {
+        if (std.mem.indexOfScalar(u8, split_chars, text[index]) == null) {
             index += 1;
             continue;
         }
         try out.append(gpa, text[start..index]);
-        while (index < text.len and std.mem.indexOfScalar(u8, sentence_end, text[index]) != null) {
+        while (index < text.len and std.mem.indexOfScalar(u8, split_chars, text[index]) != null) {
             index += 1;
         }
         start = index;
@@ -152,7 +179,7 @@ fn splitSentences(
 fn splitLongSentence(
     gpa: std.mem.Allocator,
     sentence: []const u8,
-    max_len: usize,
+    options: Options,
     chunks: *std.ArrayList([]u8),
 ) !void {
     var words: std.ArrayList([]const u8) = .empty;
@@ -163,21 +190,21 @@ fn splitLongSentence(
     defer current.deinit(gpa);
 
     for (words.items) |word| {
-        if (current.items.len + word.len < max_len) {
+        if (current.items.len + word.len < options.max_len) {
             if (current.items.len > 0) try current.append(gpa, ' ');
             try current.appendSlice(gpa, word);
             continue;
         }
 
         if (current.items.len > 0) {
-            try chunks.append(gpa, try ensurePunctuation(gpa, current.items));
+            try chunks.append(gpa, try ensurePunctuation(gpa, current.items, options.append_punctuation));
         }
         current.clearRetainingCapacity();
         try current.appendSlice(gpa, word);
     }
 
     if (current.items.len > 0) {
-        try chunks.append(gpa, try ensurePunctuation(gpa, current.items));
+        try chunks.append(gpa, try ensurePunctuation(gpa, current.items, options.append_punctuation));
     }
 }
 
@@ -211,7 +238,7 @@ fn splitWords(
 
 test "Satzzeichen trennt Abschnitte und entfaellt" {
     const gpa = std.testing.allocator;
-    var chunks = try chunkText(gpa, "Hello world. Second one!", 400);
+    var chunks = try chunkText(gpa, "Hello world. Second one!", .{ .max_len = 400 });
     defer chunks.deinit();
 
     try std.testing.expectEqual(@as(usize, 2), chunks.items.len);
@@ -221,7 +248,7 @@ test "Satzzeichen trennt Abschnitte und entfaellt" {
 
 test "Abschnitt ohne Satzzeichen bekommt ein Komma" {
     const gpa = std.testing.allocator;
-    var chunks = try chunkText(gpa, "Hallo Welt", 400);
+    var chunks = try chunkText(gpa, "Hallo Welt", .{ .max_len = 400 });
     defer chunks.deinit();
 
     try std.testing.expectEqual(@as(usize, 1), chunks.items.len);
@@ -232,7 +259,7 @@ test "Satzzeichen am Ende entfaellt und wird durch Komma ersetzt" {
     const gpa = std.testing.allocator;
     // Die Referenz trennt den Text an ".!?" und entfernt die Trenner. Der
     // Abschnitt endet danach ohne Satzzeichen und bekommt ein Komma.
-    var chunks = try chunkText(gpa, "Really?", 400);
+    var chunks = try chunkText(gpa, "Really?", .{ .max_len = 400 });
     defer chunks.deinit();
 
     try std.testing.expectEqual(@as(usize, 1), chunks.items.len);
@@ -241,7 +268,7 @@ test "Satzzeichen am Ende entfaellt und wird durch Komma ersetzt" {
 
 test "Komma und Doppelpunkt am Ende bleiben erhalten" {
     const gpa = std.testing.allocator;
-    var chunks = try chunkText(gpa, "Wait; really: yes;", 400);
+    var chunks = try chunkText(gpa, "Wait; really: yes;", .{ .max_len = 400 });
     defer chunks.deinit();
 
     try std.testing.expectEqual(@as(usize, 1), chunks.items.len);
@@ -250,7 +277,7 @@ test "Komma und Doppelpunkt am Ende bleiben erhalten" {
 
 test "Leerer und nur aus Leerraum bestehender Text liefert nichts" {
     const gpa = std.testing.allocator;
-    var chunks = try chunkText(gpa, "  ...  ", 400);
+    var chunks = try chunkText(gpa, "  ...  ", .{ .max_len = 400 });
     defer chunks.deinit();
 
     try std.testing.expectEqual(@as(usize, 0), chunks.items.len);
@@ -258,7 +285,7 @@ test "Leerer und nur aus Leerraum bestehender Text liefert nichts" {
 
 test "Zu langer Abschnitt wird an Wortgrenzen geteilt" {
     const gpa = std.testing.allocator;
-    var chunks = try chunkText(gpa, "aaaa bbbb cccc", 10);
+    var chunks = try chunkText(gpa, "aaaa bbbb cccc", .{ .max_len = 10 });
     defer chunks.deinit();
 
     try std.testing.expectEqual(@as(usize, 2), chunks.items.len);
@@ -269,7 +296,7 @@ test "Zu langer Abschnitt wird an Wortgrenzen geteilt" {
 test "Die Grenze wird in Bytes gemessen" {
     const gpa = std.testing.allocator;
     // "äöü" belegt sechs Bytes.
-    var chunks = try chunkText(gpa, "äöü bbbb", 8);
+    var chunks = try chunkText(gpa, "äöü bbbb", .{ .max_len = 8 });
     defer chunks.deinit();
 
     try std.testing.expectEqual(@as(usize, 2), chunks.items.len);
@@ -279,7 +306,7 @@ test "Die Grenze wird in Bytes gemessen" {
 
 test "Leerraum am Rand wird entfernt" {
     const gpa = std.testing.allocator;
-    var chunks = try chunkText(gpa, "\t Hallo Welt \n", 400);
+    var chunks = try chunkText(gpa, "\t Hallo Welt \n", .{ .max_len = 400 });
     defer chunks.deinit();
 
     try std.testing.expectEqual(@as(usize, 1), chunks.items.len);
@@ -290,7 +317,7 @@ test "Kurzer Abschnitt behaelt seinen Leerraum unveraendert" {
     const gpa = std.testing.allocator;
     // Die Referenz teilt nur lange Abschnitte an Wortgrenzen auf. Ein kurzer
     // Abschnitt behält den ursprünglichen Leerraum, auch geschuetzte Leerzeichen.
-    var chunks = try chunkText(gpa, "aaaa\u{00A0}bbbb", 400);
+    var chunks = try chunkText(gpa, "aaaa\u{00A0}bbbb", .{ .max_len = 400 });
     defer chunks.deinit();
 
     try std.testing.expectEqual(@as(usize, 1), chunks.items.len);
@@ -299,10 +326,63 @@ test "Kurzer Abschnitt behaelt seinen Leerraum unveraendert" {
 
 test "Geschuetzter Leerraum trennt Woerter in langen Abschnitten" {
     const gpa = std.testing.allocator;
-    var chunks = try chunkText(gpa, "aaaa\u{00A0}bbbb", 8);
+    var chunks = try chunkText(gpa, "aaaa\u{00A0}bbbb", .{ .max_len = 8 });
     defer chunks.deinit();
 
     try std.testing.expectEqual(@as(usize, 2), chunks.items.len);
     try std.testing.expectEqualStrings("aaaa,", chunks.items[0]);
     try std.testing.expectEqualStrings("bbbb,", chunks.items[1]);
+}
+
+test "Leere Trennzeichen lassen den Text ungeteilt" {
+    const gpa = std.testing.allocator;
+    var chunks = try chunkText(gpa, "Hello world. Second one!", .{
+        .max_len = 400,
+        .split_chars = "",
+        .append_punctuation = "",
+    });
+    defer chunks.deinit();
+
+    try std.testing.expectEqual(@as(usize, 1), chunks.items.len);
+    try std.testing.expectEqualStrings("Hello world. Second one!", chunks.items[0]);
+}
+
+test "Eigene Trennzeichen werden verwendet" {
+    const gpa = std.testing.allocator;
+    var chunks = try chunkText(gpa, "eins;zwei|drei", .{
+        .max_len = 400,
+        .split_chars = ";|",
+        .append_punctuation = "",
+    });
+    defer chunks.deinit();
+
+    try std.testing.expectEqual(@as(usize, 3), chunks.items.len);
+    try std.testing.expectEqualStrings("eins", chunks.items[0]);
+    try std.testing.expectEqualStrings("zwei", chunks.items[1]);
+    try std.testing.expectEqualStrings("drei", chunks.items[2]);
+}
+
+test "Ohne angehaengtes Satzzeichen bleibt der Abschnitt unveraendert" {
+    const gpa = std.testing.allocator;
+    var chunks = try chunkText(gpa, "Hallo Welt", .{
+        .max_len = 400,
+        .append_punctuation = "",
+    });
+    defer chunks.deinit();
+
+    try std.testing.expectEqual(@as(usize, 1), chunks.items.len);
+    try std.testing.expectEqualStrings("Hallo Welt", chunks.items[0]);
+}
+
+test "Null als Laengengrenze schaltet die Worttrennung ab" {
+    const gpa = std.testing.allocator;
+    var chunks = try chunkText(gpa, "aaaa bbbb cccc", .{
+        .max_len = 0,
+        .split_chars = "",
+        .append_punctuation = "",
+    });
+    defer chunks.deinit();
+
+    try std.testing.expectEqual(@as(usize, 1), chunks.items.len);
+    try std.testing.expectEqualStrings("aaaa bbbb cccc", chunks.items[0]);
 }
